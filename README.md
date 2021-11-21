@@ -7,5 +7,17 @@ You can also undertake this project using similar data from Cincinnati, Ohio.
 
 Think critically about how you might offer these predictions to a public health official in your app. What do they want to know? Also remember that while your predictions are about overdose, it may be safe to assume that these are also places where people are just using heroin.
 
-## Work Timeline
+## Project Timeline
+
+### Preliminary research
+    - examples of prediction apps 
+    - exististing programs in Mesa
+### App Concept Development
+    - answer use case questions
+    - wireframes
+### Exploratory Data Analysis
+    - Wrangle Data
+    - Build Model
+### Present
+    
 
