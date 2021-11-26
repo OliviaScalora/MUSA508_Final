@@ -16,21 +16,18 @@ library(kableExtra)
 library(tidycensus)
 library(RColorBrewer)
 library(ggthemes)
+library(sp)
+library(rgeos)
+library(maptools)
 
-colors<-brewer.pal(9, 'BuPu')
 options(scipen=999)
 options(tigris_class = "sf")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
-palette5 <- c("#f0f9e8","#bae4bc","#7bccc4","#43a2ca","#0868ac")
-palette1 <- c('#DAD7CD','#A3B18A','#588157', '#3A5A40','#344E41')
-color= '#F0563F'
-color2 = '#a32714'
-color3 = '#539470'
-colors<-brewer.pal(9, 'BuPu')
+#Load Data ----------------
 
-#load data
+#census tracts
 tracts17 <- get_acs(geography = "tract", variables = c("B25026_001","B19013_001","B25058_001",
                                                        "B06012_002", "B25003_003", "B25003_002", "B25004_001" ), 
                     year=2017, state=04, county=013, geometry=T) %>% 
@@ -51,6 +48,13 @@ tracts17 <- get_acs(geography = "tract", variables = c("B25026_001","B19013_001"
   filter(GEOID != '04013815902')%>%
   filter(GEOID != '04013810800')
 
+
+#City Boundary
+city_boundary <- st_as_sf(st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/City_Boundary.csv"), 
+                          wkt = 'Geometry', crs = 4326, agr = 'constant')%>%
+                  st_transform(st_crs(tracts17))
+
+#filter tracts within city boundary
 mesa_tracts17 <- tracts17[city_boundary,]%>%
                  dplyr::select( -NAME, -moe) %>%
                  spread(variable, estimate) %>%
@@ -61,78 +65,124 @@ mesa_tracts17 <- tracts17[city_boundary,]%>%
                         TotalPoverty = B06012_002,
                         TotalRent = B25003_003,
                         TotalOwn = B25003_002,
-                        VacantUnits = B25004_001) 
+                        VacantUnits = B25004_001)
+
+
+#ggplot()+geom_sf(data = mesa_tracts17,
+#                 aes(fill = q5(MedHHInc)),
+#                 color = "black")+
+#  scale_fill_brewer(palette=4)+
+#   geom_sf(data=city_boundary,
+#          color = 'red',
+#          size = 1,
+#          fill = NA)
+
+
+
+#Load opioid data - add count column to count amount of overdoses at each point at 1/3 mi interval grid
 
 opioid_data <- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/qufy-tzv6.json")), 
                         coords = c("longitude", "latitude"), 
                         crs = 4326, agr = "constant")%>%
-               st_transform(st_crs(tracts17))%>%filter(location.longitude != -112.225)%>%
-               mutate(point = paste(opioid_data$location.latitude, opioid_data$location.longitude))
-
+               st_transform(st_crs(tracts17))%>%filter(location.longitude != -112.225)
+opioid_data <- opioid_data%>%mutate(point = paste(opioid_data$location.latitude, opioid_data$location.longitude))
 count <- count(opioid_data,point)
-
-opioid_data <- st_join(opioid_data, count, all.x = all)
-opioid_data <-opioid_data%>%dplyr::select(-point.x,-point.y)%>%
-                rename(count = n)
-
-
+opioid_data <- (st_join(opioid_data, count, all.x = all)%>%dplyr::select(-point.x,-point.y)%>%
+  rename(count = n))
   
-count<- count(opioid_data,point)
+  
+
+#city properties - parks
+park_names<- c("Park Facilities","Park/Utility Facilities", "Parks/ Utility Facilities", "Parks",
+  "Parks ", "Urban Garden - Lease Non Profit","Parsk/ Utility  Facilities", "Pocket Park",
+  "Park/Public Safety", "Golf Course", "Citrus Grove")
+parks<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                 coords = c("longitude", "latitude"),
+                 crs = 4326, agr = "constant")%>%
+        st_transform(st_crs(tracts17))%>%
+        filter(property_use %in% park_names)
 
 
 
-opioid_data <- st_join(opioid_data, count)
+#city properties - police and fire stations
+police_fire<- c("Public Safety--Fire/Police", "Park/Public Safety")
+mesa_police_fire<-st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                 coords = c("longitude", "latitude"),
+                 crs = 4326, agr = "constant")%>%
+                 st_transform(st_crs(tracts17))%>%
+                 filter(property_use %in% police_fire)
+
+
+#city properties - vacant lots
+vacant_cat<- c("Vacant", "Vacant (ADOT remnant)")
+vacant<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                            coords = c("longitude", "latitude"),
+                            crs = 4326, agr = "constant")%>%
+             st_transform(st_crs(tracts17))%>%
+             filter(property_use %in% vacant_cat)
 
 
 
-student_dem <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Student_Demographics_-_Mesa_Public_Schools.csv")
+#city properties - child crisis center
+ccc<- "Child Crisis Center"
+cccenter<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                  coords = c("longitude", "latitude"),
+                  crs = 4326, agr = "constant")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(property_use %in% ccc)
 
-UFB_dist <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/UFB_Food_Distribution_2021.csv")
 
-zoning_district <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")
+#city properties - arts and education centera
+arts_edu_cat<- c("Mesa Arts Center","Museums","Libraries","Sequoia Charter School")
+arts_edu<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                    coords = c("longitude", "latitude"),
+                    crs = 4326, agr = "constant")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(property_use %in% arts_edu_cat)
 
-bus_ridership<- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Bus_Ridership.csv")
 
-city_boundary<- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/City_Boundary.csv")
 
-city_boundary <- st_as_sf(city_boundary, wkt = 'Geometry',
-                        crs = 4326, agr = 'constant') %>%
+#city properties - public housing
+pub_house_cat<- c("Housing", "Escobedo Housing", "NSP", "Residential Property")
+public_housing<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                    coords = c("longitude", "latitude"),
+                    crs = 4326, agr = "constant")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(property_use %in% pub_house_cat)
+
+
+#Zoning data
+zoning_district <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
   st_transform(st_crs(tracts17))
 
-parcels<- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/City_Parcel_Polygons.csv")
 
-parcels<- st_as_sf(parcels, wkt = 'Geometry',
-                          crs = 4326, agr = 'constant') %>%
-  st_transform(st_crs(tracts17))
-
-
-
+#Residential
+res<- c("RM-3","RM-2","RM-4","RS-15","RS-35","RS-43","RS-6","RS-90","RS-9","RSL-2.5","RSL-4.5","RSL-2.5","T4N","PC","T4NF")
+Residential <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% res)
 
 
-mesa_tracts17 = st_filter(mesa_tracts17, city_boundary, sparse = TRUE, prepared = TRUE)
-ggplot()+geom_sf(data = mesa_tracts17,
-                  aes(fill = q5(TotalPoverty)),
-                  color = "black")+
-         scale_fill_brewer(palette=4)+
-         geom_sf(data=city_boundary,
-                 color = 'red',
-                 size = 1,
-                 fill = NA)
+#Commercial
+com<- c("GC","LC","NC","OC","RSL-4.0")
+Commercial <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% com)
 
 
-#geom_sf(data=zoning_district,
-#        aes(fill = zoning),
-#        color = NA)+
+#Downtown
+dt<- c("DC","DB-2","DB-1", "DR-2", "DR-3", "DR-1")
+Downtown <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% dt)
 
 
+#Industrial
+ind<- c("LI", "HI", "AG", "AG")
+Industrial <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% ind)
 
-fishnet <- 
-  st_make_grid(city_boundary,
-               cellsize = 500, 
-               square = TRUE) %>%
-  .[city_boundary] %>%            # <- MDH Added
-  st_sf() %>%
-  mutate(uniqueID = rownames(.))
 
 
 ggplot()+
@@ -140,17 +190,67 @@ ggplot()+
           color = 'black',
           size = 1,
           fill = 'grey95')+
+  geom_sf(data= Residential,
+          color = NA,
+          fill = 'blue')+
+  geom_sf(data= Commercial,
+          color = NA,
+          fill = 'red')+
+  geom_sf(data= Downtown,
+          color = NA,
+          fill = 'orange')+
+  geom_sf(data= Industrial,
+          color = NA,
+          fill = 'yellow',
+          alpha= .45)
+
+
+
+#load parcel data - necessary?
+#parcels<- st_as_sf((st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/City_Parcel_Polygons.csv")), wkt = 'Geometry',
+#                    crs = 4326, agr = 'constant') %>%
+#                    st_transform(st_crs(tracts17))
+
+
+
+#make fishnet
+fishnet <- 
+  st_make_grid(city_boundary,
+               cellsize = 1000, 
+               square = TRUE) %>%
+  .[city_boundary] %>%  
+  st_sf() %>%
+  mutate(uniqueID = rownames(.))
+
+
+#myPalette <- colorRampPalette(rev(brewer.pal(11, "YlOrRd")))
+
+
+#plot opioid overdoses 
+ggplot()+
+  geom_sf(data = mesa_tracts17,
+          aes(fill = q5(TotalPoverty)),
+          color = "black")+
+  scale_fill_brewer(palette=1)+
   geom_sf(data = opioid_data,
-          aes(color = count, 
-              size = count))+
-  scale_color_distiller(palette=4, 
-                     direction = 1,
-                     guide =)+
-  scale_color_continuous(breaks=seq(1, 73, by=10))+
+          aes(size = count),
+          color = 'red',
+          alpha = .5)+
   scale_size_continuous(breaks=seq(1, 73, by=10),
                         range = c(1,10))+
-  guides(color= guide_legend(), size=guide_legend())+ 
+ # scale_color_continuous(breaks=seq(1, 73, by=10))+
+#  scale_colour_gradientn(colours = (colorRampPalette(rev(brewer.pal(9, "YlOrRd"))))(10),
+#                         breaks=seq(1, 73, by=10))+
+  guides(color= guide_legend(), 
+         size= guide_legend(title = 'Overdose Incidents'),
+         fill = guide_legend(title = 'Total Living Below Poverty'))+ 
+  geom_sf(data=city_boundary,
+          color = 'black',
+          size = 1,
+          fill = NA)
   theme_classic()
+
+
 
 #join overdoses to the fishnet
 opioid_net <- 
@@ -162,7 +262,12 @@ opioid_net <-
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
 
 ggplot() +
-  geom_sf(data = opioid_net, aes(fill = countoverdose)) +
-  scale_fill_viridis() +
+  geom_sf(data = opioid_net, aes(fill = countoverdose), color= NA)+
+  scale_fill_viridis(option = 'F',direction = -1) +
   labs(title = "Count of Overdoses for the fishnet") +
-  mapTheme()
+  theme_classic()+theme(panel.backgroun = element_rect(fill = 'grey35'))
+
+Industrial_group = poly2nb(Industrial, queen = TRUE)
+
+
+?unionSpatialPolygons()
