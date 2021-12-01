@@ -46,7 +46,13 @@ tracts17 <- get_acs(geography = "tract", variables = c("B25026_001","B19013_001"
   filter(GEOID != '04013420110')%>%
   filter(GEOID != '04013816900')%>%
   filter(GEOID != '04013815902')%>%
-  filter(GEOID != '04013810800')
+  filter(GEOID != '04013810800')%>%
+  filter(GEOID != '04013815600')%>%
+  filter(GEOID != '04013815200')%>%
+  filter(GEOID != '04013319904')%>%
+  filter(GEOID != '04013319402')%>%
+  filter(GEOID != '04013319404')%>%
+  filter(GEOID !="04013319906")
 
 
 #City Boundary
@@ -67,16 +73,14 @@ mesa_tracts17 <- tracts17[city_boundary,]%>%
                         TotalOwn = B25003_002,
                         VacantUnits = B25004_001)
 
-
-#ggplot()+geom_sf(data = mesa_tracts17,
-#                 aes(fill = q5(MedHHInc)),
-#                 color = "black")+
-#  scale_fill_brewer(palette=4)+
-#   geom_sf(data=city_boundary,
-#          color = 'red',
-#          size = 1,
-#          fill = NA)
-
+# ggplot()+geom_sf(data = mesa_tracts17,
+#                  aes(fill =TotalPop),
+#                  color = "black")+
+#   scale_fill_distiller(palette=4)+
+#    geom_sf(data=city_boundary,
+#           color = 'red',
+#           size = 1,
+#           fill = NA)
 
 
 #Load opioid data - add count column to count amount of overdoses at each point at 1/3 mi interval grid
@@ -229,7 +233,7 @@ fishnet <-
 #plot opioid overdoses 
 ggplot()+
   geom_sf(data = mesa_tracts17,
-          aes(fill = q5(TotalPoverty)),
+          aes(fill = q5(TotalPop)),
           color = "black")+
   scale_fill_brewer(palette=1)+
   geom_sf(data = opioid_data,
