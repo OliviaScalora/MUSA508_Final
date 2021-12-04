@@ -94,7 +94,7 @@ count <- count(opioid_data,point)
 opioid_data <- (st_join(opioid_data, count, all.x = all)%>%dplyr::select(-point.x,-point.y)%>%
   rename(count = n))
   
-  
+
 
 #city properties - parks
 park_names<- c("Park Facilities","Park/Utility Facilities", "Parks/ Utility Facilities", "Parks",
@@ -220,7 +220,7 @@ ggplot()+
 #make fishnet
 fishnet <- 
   st_make_grid(city_boundary,
-               cellsize = 1000, 
+               cellsize = 1760, 
                square = TRUE) %>%
   .[city_boundary] %>%  
   st_sf() %>%
@@ -251,7 +251,7 @@ ggplot()+
   geom_sf(data=city_boundary,
           color = 'black',
           size = 1,
-          fill = NA)
+          fill = NA)+
   theme_classic()
 
 
@@ -268,6 +268,7 @@ opioid_net <-
 ggplot() +
   geom_sf(data = opioid_net, aes(fill = countoverdose), color= NA)+
   scale_fill_viridis(option = 'F',direction = -1) +
+  geom_sf(data=city_boundary,color="black", fill=NA)+
   labs(title = "Count of Overdoses for the fishnet") +
   theme_classic()+theme(panel.backgroun = element_rect(fill = 'grey35'))
 
