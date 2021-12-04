@@ -1,5 +1,5 @@
 #Setup -------------------
-
+install.packages('units')
 #load libraries
 library(tidyverse)
 library(sf)
@@ -19,11 +19,71 @@ library(ggthemes)
 library(sp)
 library(rgeos)
 library(maptools)
+library(dplyr)
+library(units)
 
 options(scipen=999)
 options(tigris_class = "sf")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+census_api_key("d5e25f48aa48bf3f0766baab06d59402ea032067", overwrite = TRUE)
+
+#load functions
+create_regions <- function(data) {
+  group <- rep(NA, length(data))
+  group_val <- 0
+  while(NA %in% group) {
+    index <- min(which(is.na(group)))
+    nb <- unlist(data[index])
+    nb_value <- group[nb]
+    is_na <- is.na(nb_value)
+    if(sum(!is_na) != 0){
+      prev_group <- nb_value[!is_na][1]
+      group[index] <- prev_group
+      group[nb[is_na]] <- prev_group
+    } else {
+      group_val <- group_val + 1
+      group[index] <- group_val
+      group[nb] <- group_val
+    }
+  }
+  group
+}
+
+
+clusterSF <- function(sfpolys, thresh){
+  dmat = st_distance(sfpolys)
+  hc = hclust(as.dist(dmat>(thresh%>%set_units(ft))), method="single")
+  groups = cutree(hc, h=0.5)
+  d = st_sf(
+    geom = do.call(c,
+                   lapply(1:max(groups), function(g){
+                     st_union(sfpolys[groups==g,])
+                   })
+    )
+  )
+  d$group = 1:nrow(d)
+  d
+}
+
+mapTheme<- function(base_size = 12, title_size = 16) {
+  theme(
+    text = element_text( color = "black"),
+    plot.title = element_text(size = title_size,colour = "black"),
+    plot.subtitle=element_text(face="italic"),
+    plot.caption=element_text(hjust=0),
+    axis.ticks = element_blank(),
+    panel.background = element_blank(),axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    strip.text.x = element_text(size = 14),
+    legend.key = element_rect(fill=NA))
+}
+
 
 #Load Data ----------------
 
@@ -93,108 +153,141 @@ opioid_data <- opioid_data%>%mutate(point = paste(opioid_data$location.latitude,
 count <- count(opioid_data,point)
 opioid_data <- (st_join(opioid_data, count, all.x = all)%>%dplyr::select(-point.x,-point.y)%>%
   rename(count = n))
-  
-  
+
+#load street network data 
+street_network <- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/y3aj-3i5y.json")), 
+                                            crs = 4326, agr = "constant")%>%st_transform(st_crs(tracts17))%>%
+  filter(SpeedLimit =='65')
+
+opioid_data <- opioid_data%>%mutate(point = paste(opioid_data$location.latitude, opioid_data$location.longitude))
+count <- count(opioid_data,point)
+opioid_data <- (st_join(opioid_data, count, all.x = all)%>%dplyr::select(-point.x,-point.y)%>%
+                  rename(count = n))
 
 #city properties - parks
-park_names<- c("Park Facilities","Park/Utility Facilities", "Parks/ Utility Facilities", "Parks",
-  "Parks ", "Urban Garden - Lease Non Profit","Parsk/ Utility  Facilities", "Pocket Park",
-  "Park/Public Safety", "Golf Course", "Citrus Grove")
+# park_names<- c("Park Facilities","Park/Utility Facilities", "Parks/ Utility Facilities", "Parks",
+#   "Parks ", "Urban Garden - Lease Non Profit","Parsk/ Utility  Facilities", "Pocket Park",
+#   "Park/Public Safety", "Golf Course", "Citrus Grove")
 parks<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
                  coords = c("longitude", "latitude"),
                  crs = 4326, agr = "constant")%>%
         st_transform(st_crs(tracts17))%>%
-        filter(property_use %in% park_names)
+        filter(property_use %in%  c("Park Facilities","Park/Utility Facilities", "Parks/ Utility Facilities", "Parks",
+                                    "Parks ", "Urban Garden - Lease Non Profit","Parsk/ Utility  Facilities", "Pocket Park",
+                                    "Park/Public Safety", "Golf Course", "Citrus Grove"))%>%
+        mutate(ID = 1:n(),
+               Legend = "Park")%>%dplyr::select(ID, Legend, geometry)
 
 
 
 #city properties - police and fire stations
-police_fire<- c("Public Safety--Fire/Police", "Park/Public Safety")
+# police_fire<- c("Public Safety--Fire/Police", "Park/Public Safety")
 mesa_police_fire<-st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
                  coords = c("longitude", "latitude"),
                  crs = 4326, agr = "constant")%>%
                  st_transform(st_crs(tracts17))%>%
-                 filter(property_use %in% police_fire)
+                 filter(property_use %in% c("Public Safety--Fire/Police", "Park/Public Safety"))%>%
+  mutate(ID = 1:n(),
+         Legend = "Police&Fire Station")%>%dplyr::select(ID,Legend,geometry)
 
 
 #city properties - vacant lots
-vacant_cat<- c("Vacant", "Vacant (ADOT remnant)")
+# vacant_cat<- c("Vacant", "Vacant (ADOT remnant)")
 vacant<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
                             coords = c("longitude", "latitude"),
                             crs = 4326, agr = "constant")%>%
              st_transform(st_crs(tracts17))%>%
-             filter(property_use %in% vacant_cat)
+             filter(property_use %in% c("Vacant", "Vacant (ADOT remnant)"))%>%
+  mutate(ID = 1:n(),
+         Legend = "Vacant Property")%>%dplyr::select(ID, Legend,geometry)
 
 
 
 #city properties - child crisis center
-ccc<- "Child Crisis Center"
+# ccc<- "Child Crisis Center"
 cccenter<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
                   coords = c("longitude", "latitude"),
                   crs = 4326, agr = "constant")%>%
   st_transform(st_crs(tracts17))%>%
-  filter(property_use %in% ccc)
+  filter(property_use %in% "Child Crisis Center")%>%
+  mutate(ID = 1:n(),
+         Legend = "Child Crisis Center")%>%dplyr::select(ID, Legend,geometry)
 
 
 #city properties - arts and education centera
-arts_edu_cat<- c("Mesa Arts Center","Museums","Libraries","Sequoia Charter School")
+# arts_edu_cat<- c("Mesa Arts Center","Museums","Libraries","Sequoia Charter School")
 arts_edu<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
                     coords = c("longitude", "latitude"),
                     crs = 4326, agr = "constant")%>%
   st_transform(st_crs(tracts17))%>%
-  filter(property_use %in% arts_edu_cat)
+  filter(property_use %in% c("Mesa Arts Center","Museums","Libraries","Sequoia Charter School"))%>%
+  mutate(ID = 1:n(),
+         Legend = "Arts and Education")%>%dplyr::select(ID, Legend,geometry)
 
 
 
 #city properties - public housing
-pub_house_cat<- c("Housing", "Escobedo Housing", "NSP", "Residential Property")
+# pub_house_cat<- c("Housing", "Escobedo Housing", "NSP", "Residential Property")
 public_housing<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
                     coords = c("longitude", "latitude"),
                     crs = 4326, agr = "constant")%>%
   st_transform(st_crs(tracts17))%>%
-  filter(property_use %in% pub_house_cat)
+  filter(property_use %in% c("Housing", "Escobedo Housing", "NSP", "Residential Property"))%>%
+  mutate(ID = 1:n(),
+         Legend = "Public Housing")%>%dplyr::select(ID, Legend,geometry)
 
 
 #Zoning data
-zoning_district <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
-  st_transform(st_crs(tracts17))
+# zoning_district <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+#   st_transform(st_crs(tracts17))
 
 
-#Residential
-res<- c("RM-3","RM-2","RM-4","RS-15","RS-35","RS-43","RS-6","RS-90","RS-9","RSL-2.5","RSL-4.5","RSL-2.5","T4N","PC","T4NF")
-Residential <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+#High Density residential
+HD_Residential <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
   st_transform(st_crs(tracts17))%>%
-  filter(zoning %in% res)
+  filter(zoning %in% c("RM-3","RM-2","RM-4"))%>%select(objectid, geometry)
+
+#Low Density Residential- "single residence" zoning
+LD_Residential <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% c("RS-15","RS-35","RS-43","RS-6","RS-90","RS-9","PC","RSL-2.5","RSL-4.5","RSL-2.5"))%>%
+  select(objectid, geometry)
 
 
 #Commercial
-com<- c("GC","LC","NC","OC","RSL-4.0")
+#com<- c("GC","LC","NC","OC","RSL-4.0")
 Commercial <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
   st_transform(st_crs(tracts17))%>%
-  filter(zoning %in% com)
+  filter(zoning %in% c("GC","LC","NC","OC","RSL-4.0"))%>%
+  select(objectid, geometry)
 
 
 #Downtown
-dt<- c("DC","DB-2","DB-1", "DR-2", "DR-3", "DR-1")
+#dt<- c("DC","DB-2","DB-1", "DR-2", "DR-3", "DR-1")
 Downtown <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
   st_transform(st_crs(tracts17))%>%
-  filter(zoning %in% dt)
+  filter(zoning %in% c("DC","DB-2","DB-1", "DR-2", "DR-3", "DR-1"))%>%
+  select(objectid, geometry)
 
 
 #Industrial
-ind<- c("LI", "HI", "AG", "AG")
+#ind<- c("LI", "HI", "AG", "AG")
 Industrial <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
   st_transform(st_crs(tracts17))%>%
-  filter(zoning %in% ind)
+  filter(zoning %in% c("LI", "HI", "AG", "AG"))%>%
+  select(objectid, geometry)
 
 
-
+#ZonePlot1
 ggplot()+
   geom_sf(data=city_boundary,
           color = 'black',
           size = 1,
           fill = 'grey95')+
-  geom_sf(data= Residential,
+  geom_sf(data= LD_Residential,
+          color = NA,
+          fill = 'lightblue')+
+  geom_sf(data= HD_Residential,
           color = NA,
           fill = 'blue')+
   geom_sf(data= Commercial,
@@ -206,7 +299,7 @@ ggplot()+
   geom_sf(data= Industrial,
           color = NA,
           fill = 'yellow',
-          alpha= .45)
+          alpha= .45)+mapTheme()
 
 
 
@@ -220,7 +313,7 @@ ggplot()+
 #make fishnet
 fishnet <- 
   st_make_grid(city_boundary,
-               cellsize = 1000, 
+               cellsize = 1760, 
                square = TRUE) %>%
   .[city_boundary] %>%  
   st_sf() %>%
@@ -251,8 +344,7 @@ ggplot()+
   geom_sf(data=city_boundary,
           color = 'black',
           size = 1,
-          fill = NA)
-  theme_classic()
+          fill = NA)+mapTheme()
 
 
 
@@ -265,13 +357,193 @@ opioid_net <-
          uniqueID = rownames(.),
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
 
+
+#opioid fishnet plot
 ggplot() +
   geom_sf(data = opioid_net, aes(fill = countoverdose), color= NA)+
-  scale_fill_viridis(option = 'F',direction = -1) +
-  labs(title = "Count of Overdoses for the fishnet") +
-  theme_classic()+theme(panel.backgroun = element_rect(fill = 'grey35'))
+  scale_fill_viridis(option = 'A') +
+  labs(title = "Count of Overdoses for the fishnet",
+       subtitle = "Mesa, AZ",
+       caption = "Lighter pixels represent areas of higher observed opioid overdose incidents.") +
+  mapTheme()
 
-Industrial_group = poly2nb(Industrial, queen = TRUE)
+#testplot
+ggplot()+
+  geom_sf(data= mesa_tracts17,fill=NA,color='black')+
+  geom_sf(data=arts_edu, color = 'red')+
+  geom_sf(data=mesa_police_fire, color='blue')+
+  geom_sf(data=parks, color='green')+
+  geom_sf(data=public_housing,color='orange')+
+  geom_sf(data=cccenter, color = 'yellow')+
+  mapTheme()
 
 
-?unionSpatialPolygons()
+#Grouping Zoning Cluster together
+#Industrial
+#convert Industrial sf to sp class
+# ind_sp<- as(Industrial, Class="Spatial")
+# #Industrial Neighbor List
+# ind_nb <- poly2nb(ind_sp, queen = TRUE)
+# #create regions
+# region_ind <- create_regions(ind_nb)
+# ind_rgn <- spCbind(ind_sp, region_ind)
+# ind_sp_2 <- unionSpatialPolygons(ind_rgn, region_ind)
+# Industrial_R<- st_as_sf(ind_sp_2)%>%mutate(ID = 1:n())
+
+# cluster industrial polygons that are within 100 ft of one another
+# Industrial_R<- clusterSF(Industrial,100)
+Ind_center<- st_centroid(Industrial)%>%mutate(Legend = "Industrial")
+# plot(st_centroid(Industrial_R))
+
+#Commercial
+#convert Commercial sf to sp class
+# com_sp<- as(Commercial, Class="Spatial")
+# #Commercial Neighbor List
+# com_nb <- poly2nb(com_sp, queen = TRUE)
+# #create regions
+# region_com <- create_regions(com_nb)
+# com_rgn <- spCbind(com_sp, region_com)
+# com_sp_2 <- unionSpatialPolygons(com_rgn, region_com)
+# Commercial_R<- st_as_sf(com_sp_2)%>%mutate(ID = 1:n())
+
+# cluster commercial polygons that are within 100 ft of one another
+# Commercial_R<- clusterSF(Commercial,1000)
+Comm_center<- st_centroid(Commercial)%>%mutate(Legend = "Commercial")
+# plot(st_centroid(Commercial_R))
+
+#Residential
+#convert Residential sf to sp class
+# res_sp<- as(Residential, Class="Spatial")
+# #Residential Neighbor List
+# res_nb <- poly2nb(res_sp,queen = TRUE)
+# #create regions
+# region_res <- create_regions(res_nb)
+# res_rgn <- spCbind(res_sp, region_res)
+# res_sp_2 <- unionSpatialPolygons(res_rgn, region_res)
+# Residential_R<- st_as_sf(res_sp_2)%>%mutate(ID = 1:n())
+
+# cluster low density residential polygons that are within 100 ft of one another
+#takes way too long to run 
+# LD_Residential_R<- clusterSF(LD_Residential,100)
+LDR_center<- st_centroid(LD_Residential)%>%mutate(Legend = "Low Density Residential")
+# plot(st_centroid(Residential))
+
+# cluster high density residential polygons that are within 100 ft of one another
+# HD_Residential_R<- clusterSF(HD_Residential,100)
+HDR_center<- st_centroid(HD_Residential)%>%mutate(Legend = "High Density Residential")
+# plot(st_centroid(HD_Residential_R))
+
+# cluster downtown polygons that are within 100 ft of one another
+# Downtown_R<- clusterSF(Downtown,1000)
+DT_center<- st_centroid(Downtown)%>%mutate(Legend = "Downtown")
+plot(DT_center)
+
+
+ggplot()+
+  geom_sf(data= mesa_tracts17,fill=NA,color='black', size = .5)+
+   geom_sf(data=arts_edu, color = 'red', size = .5)+
+  # geom_sf(data=mesa_police_fire, color='blue', size = .5)+
+  # geom_sf(data=parks, color='green', size = .5)+
+  # geom_sf(data=public_housing,color='orange', size = .5)+
+  # geom_sf(data=cccenter, color = 'yellow', size = .5)+
+  # geom_sf(data=DT_center, color = 'pink', size = .5)+
+  # geom_sf(data=HDR_center, color = 'black', size = .5)+
+  # geom_sf(data=LDR_center, color = 'grey', size = .5)+
+  # geom_sf(data=Comm_center, color = 'red', size = .5)+
+  # geom_sf(data=Ind_center, color = 'blue', size = .5)+
+  # geom_sf(data=vacant, color = 'red', size = .5)+
+  mapTheme()
+
+#Joing Zone Data to Fishnet
+zone_vars_net <- 
+  rbind(DT_center, HDR_center, LDR_center, Comm_center, Ind_center) %>%
+  st_join(., fishnet, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID, Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet) %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
+
+zone_vars_net.long <- 
+  gather(zone_vars_net, Variable, value, -geometry, -uniqueID)
+zone_vars <- unique(zone_vars_net.long$Variable)
+zone_mapList <- list()
+
+for(i in zone_vars){
+  zone_mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(zone_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'A') +
+    labs(title=i) +
+    mapTheme()
+  }
+
+do.call(grid.arrange,c(mapList, ncol=3, top="Zone by Fishnet"))
+
+#nearest neighbor function for point data
+point_vars_net <- 
+  rbind(arts_edu,cccenter,mesa_police_fire,parks,public_housing,vacant) %>%
+  st_join(., fishnet, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID,Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet) %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
+
+point_vars_net.long <- 
+  gather(point_vars_net, Variable, value, -geometry, -uniqueID)
+point_vars <- unique(point_vars_net.long$Variable)
+point_mapList <- list()
+
+for(i in point_vars){
+  point_mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(point_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'A') +
+    labs(title=i) +
+    mapTheme()
+}
+
+do.call(grid.arrange,c(point_mapList, ncol=3, top="Risk Factor by Fishnet"))
+
+point_vars_net.nn <-
+  point_vars_net %>%
+  mutate(
+    park.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(parks),3),
+    ccc.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(cccenter),3),
+    art_edu.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(arts_edu),3),
+    PF.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(mesa_police_fire),3),
+    Pub_hous.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(public_housing),3),
+    Vacant.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(vacant),3))%>%select(ends_with(".nn"), 
+                                                                                                   uniqueID, geometry)
+
+point_vars_net.long.nn <- 
+  gather(point_vars_net.nn, Variable, value, -geometry, -uniqueID)
+point_vars.nn <- unique(point_vars_net.long.nn$Variable)
+point_mapList.nn <- list()
+
+for(i in point_vars.nn){
+  point_mapList.nn[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(point_vars_net.long.nn, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'A') +
+    labs(title=i) +
+    mapTheme()
+}
+
+do.call(grid.arrange,c(point_mapList.nn, ncol=3, top="Nearest Neighbor Risk Factors by Fishnet"))
+
