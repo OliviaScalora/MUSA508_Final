@@ -1,5 +1,6 @@
 #Setup -------------------
 install.packages('units')
+install.packages('geojsonio')
 #load libraries
 library(tidyverse)
 library(sf)
@@ -21,6 +22,7 @@ library(rgeos)
 library(maptools)
 library(dplyr)
 library(units)
+library(geojsonio)
 
 options(scipen=999)
 options(tigris_class = "sf")
@@ -154,15 +156,16 @@ count <- count(opioid_data,point)
 opioid_data <- (st_join(opioid_data, count, all.x = all)%>%dplyr::select(-point.x,-point.y)%>%
   rename(count = n))
 
-#load street network data 
-street_network <- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/y3aj-3i5y.json")), 
-                                            crs = 4326, agr = "constant")%>%st_transform(st_crs(tracts17))%>%
-  filter(SpeedLimit =='65')
+#city parcel shapes
+city_parcels <- st_as_sf(read.socrata("https://data.mesaaz.gov/resource/8mhi-jyh8.csv"),wkt = 'geometry', 
+                         crs = 4326, agr = "constant")%>%
+  st_transform(st_crs(tracts17))
 
-opioid_data <- opioid_data%>%mutate(point = paste(opioid_data$location.latitude, opioid_data$location.longitude))
-count <- count(opioid_data,point)
-opioid_data <- (st_join(opioid_data, count, all.x = all)%>%dplyr::select(-point.x,-point.y)%>%
-                  rename(count = n))
+
+####code doesnt work yet - still trouble shooting
+highway <- st_as_sf(read.socrata("https://data.mesaaz.gov/resource/y3aj-3i5y.csv"),wkt = 'Geometry', 
+                     crs = 4326, agr = "constant")%>%filter(SpeedLimit = '65')%>%dplyr::select('Full Street Name', Geometry, SpeedLimit)
+  st_transform(st_crs(tracts17))
 
 #city properties - parks
 # park_names<- c("Park Facilities","Park/Utility Facilities", "Parks/ Utility Facilities", "Parks",
