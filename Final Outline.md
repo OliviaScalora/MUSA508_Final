@@ -47,8 +47,10 @@ Think critically about how you might offer these predictions to a public health 
     
 #### <li> What is the use case?  </li>
     
-Predict heroin overdose events to better allocate prevention resources.  
-Create an application that will help health officials allocate prevention resources.
+Create a user-friendly web application accessible to healthcare officials that visualizes and describes the best 
+locations for potential Opioid Observation and Treatment Centers (OOTC) - A space that provides support, safe monitoring, treatment, and primary care for
+individuals who are using and would otherwise be on the street. 
+City and healthcare officials can properly allocate staff and resources to creating these centers with the goal of mitigating opioid overdose death. 
     
 #### <li> How could data make a difference in answering this question? Do you have a sense for the business as usual decision making? </li>
 
