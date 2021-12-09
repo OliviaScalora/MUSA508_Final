@@ -51,7 +51,7 @@ Think critically about how you might offer these predictions to a public health 
 Propose creation of new program - Opioid Observation and Treatment Center (OOTC). 
 OOTC will serve two purposes  
     
-* Be a safe space that provides support, safe - monitoring, overdose treatment, and primary care for individuals who are using and would otherwise be on the street.   
+* Be a safe space that provides support, safe - monitoring/safe injection site, overdose treatment, and primary care for individuals who are using and would otherwise be on the street.   
 * Have staff and resources prepared for emergency response to overdose incidents -- cater to public and residential overdoses.   
     
   Create a user-friendly web application accessible to healthcare officials that visualizes the urgency for these new centers and describes the best locations for potential Opioid Observation and Treatment Centers (OOTC). City and healthcare officials can properly allocate staff and resources to creating these centers with the goal of mitigating opioid overdose death. 
