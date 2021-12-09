@@ -62,7 +62,18 @@ Mesa is doing a lot of research on Opiod crisis already – how is our model imp
 In 2020, the problem of opioid overdose incidents in Mesa increased 76% and the number of deaths as a result of opioid overdose grew 132%.   
 Where are opioid overdoses occurring in Mesa? Map shows approximate locations and are rounded to 1/3 mile increments – points do not represent actual locations of incidents. Map shows aggregate # of overdose incidents per block group  
 [MaricopaRx](https://www.maricoparx.org/) is an online tool to connect treatment providers, educators, community-based organizers, law enforcement, and other stakeholders   
-
+    
+Arizona opioid plan solutions  
+Arizona’s Healthcare Cost Containment System (AHCCCS) - leading payer for substance absue treatment in the state – 2015 - $162,939,257 to 2017 - $236,316,548 (69% increase in investments) 
+Department of Child Safety (DCS)– offers substance abuse treatment to parents who are working toward reunification when addiction is a factor 
+Department of Corrections (ADC) - provides additional substance abuse treatment to inmates 
+Collectively, the stat invests $265 million annually in substance abuse treatment and prevention 
+    
+The problem-  
+inconsistent community care – individuals seeking treatment are not always elligible to reside in licenses behavioral health residential facilities or recovery homes 
+overdose treatment – focuses on immediate treatment, does not treat underlying issue -  only 47% of overdose patients are referred to behavioral health providers upon release 
+Gaps in treatment facility access – there are still people not elligible for AHCCCS that are uninsured or underinsured and are unable to receive treatment due to cost 
+    
 #### <li>What datasets have you identified to help you answer this question? </li>
 
 *   [Fire and Medical Opioid Overdose Incidents](https://data.mesaaz.gov/Fire-and-Medical/Fire-and-Medical-Opioid-Overdose-Incidents/qufy-tzv6) - Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.
