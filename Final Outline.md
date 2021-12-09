@@ -47,9 +47,14 @@ Think critically about how you might offer these predictions to a public health 
     
 #### <li> What is the use case?  </li>
     
+Create a model that predicts where opioid overdoses are most likely to occur in Mesa AZ. 
+Propose creation of new program - Opioid Observation and Treatment Center (OOTC). 
+OOTC will serve two purposes - 
+        1. Be a safe space that provides support, safe - monitoring, overdose treatment, and primary care for individuals who are using and would otherwise be on the street. 
+        2. Have staff and resources prepared for emergency response to overdose incidents -- cater to public and residential overdoses.
 Create a user-friendly web application accessible to healthcare officials that visualizes and describes the best 
-locations for potential Opioid Observation and Treatment Centers (OOTC) - A space that provides support, safe monitoring, treatment, and primary care for
-individuals who are using and would otherwise be on the street. 
+locations for potential Opioid Observation and Treatment Centers (OOTC)
+    
 City and healthcare officials can properly allocate staff and resources to creating these centers with the goal of mitigating opioid overdose death. 
     
 #### <li> How could data make a difference in answering this question? Do you have a sense for the business as usual decision making? </li>
