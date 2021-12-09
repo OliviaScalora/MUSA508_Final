@@ -49,7 +49,7 @@ Think critically about how you might offer these predictions to a public health 
     
 Create a model that predicts where opioid overdoses are most likely to occur in Mesa AZ. 
 Propose creation of new program - Opioid Observation and Treatment Center (OOTC). 
-OOTC will serve two purposes - 
+OOTC will serve two purposes
     
        * Be a safe space that provides support, safe - monitoring, overdose treatment, and primary care for individuals who are using and would otherwise be on the street.   
        * Have staff and resources prepared for emergency response to overdose incidents -- cater to public and residential overdoses.
