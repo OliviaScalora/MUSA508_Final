@@ -1,10 +1,10 @@
 #Setup -------------------
-install.packages('units')
-install.packages('geojsonio')
-install.packages("data.table")
-install.packages("RgoogleMaps")
-install.packages("ggmap")
-#load libraries
+# install.packages('units')
+# install.packages('geojsonio')
+# install.packages("data.table")
+# install.packages("RgoogleMaps")
+# install.packages("ggmap")
+# #load libraries
 library(tidyverse)
 library(sf)
 library(RSocrata)
@@ -27,8 +27,8 @@ library(dplyr)
 library(units)
 library(geojsonio)
 library(data.table)
-library(RgoogleMaps)
-library(ggmap)
+# library(RgoogleMaps)
+# library(ggmap)
 
 options(scipen=999)
 options(tigris_class = "sf")
@@ -36,7 +36,7 @@ options(tigris_class = "sf")
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
 census_api_key("d5e25f48aa48bf3f0766baab06d59402ea032067", overwrite = TRUE)
-register_google(key = "AIzaSyAcot6-KJnKCwIQHJmFO5YDI3TYdXh2Y8I", write = TRUE)
+# register_google(key = "AIzaSyAcot6-KJnKCwIQHJmFO5YDI3TYdXh2Y8I", write = TRUE)
 
 #load functions
 create_regions <- function(data) {
@@ -158,6 +158,16 @@ city_boundary <- st_as_sf(st_read("https://raw.githubusercontent.com/OliviaScalo
                           wkt = 'Geometry', crs = 4326, agr = 'constant')%>%
   st_transform(st_crs(tracts17))
 
+council_districts<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/4scp-vfkf.json")),
+                 coords = c("longitude", "latitude"),
+                 crs = 4326, agr = "constant")%>%
+  st_transform(st_crs(tracts17))
+
+council_districts<- st_as_sf(read.socrata("https://data.mesaaz.gov/resource/4scp-vfkf.csv"),
+                             wkt = 'geometry',crs = 4326, agr = "constant")%>%
+  st_transform(st_crs(tracts17))
+
+
 #filter tracts within city boundary
 mesa_tracts17 <- tracts17[city_boundary,]%>%
   dplyr::select( -NAME, -moe) %>%
@@ -172,9 +182,7 @@ mesa_tracts17 <- tracts17[city_boundary,]%>%
          VacantUnits = B25004_001)
 
 #census block groups
-blockgroups17 <- get_acs(geography = "block group", variables = c("B01003_001","B19013_001","B25058_001", "B25058_001", "B25003_002", "B25004_001", 'B25001_001', 'B25003_003', 'B02001_002','B06012_002E','B03002_012'), 
-                    year=2017, state=04, county=013, geometry=T) %>% 
-  st_transform('EPSG:2224')
+ 
 
 mesa_bg17 <- blockgroups17[city_boundary,]%>%
   dplyr::select( -NAME, -moe) %>%
@@ -224,11 +232,10 @@ hisp_bg <- mesa_bg17%>%filter(Pct.Hisp >= .5)%>%dplyr::select(GEOID,geometry,)%>
 white_bg <- mesa_bg17%>%filter(Pct.White >= .85)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Majority White')
 
 
+
 ggplot()+
-   geom_sf(data = white_bg, fill = 'lightblue', color = 'black', alpha = .5)+
-   geom_sf(data = hisp_bg, fill = 'blue', alpha = .5)+
-   geom_sf(data = low_med_rent_BG, fill = 'purple', alpha = .5)+
-  geom_sf(data = city_boundary, fill=NA, color= 'black')
+  geom_sf(data=city_boundary, fill= NA, color = 'black')+
+   geom_sf(data =low_inc_BG, fill = 'lightblue', color = 'black', alpha = .5)+mapTheme()
 
 
 #----OPIOID DATA----
@@ -682,9 +689,9 @@ do.call(grid.arrange,c(point_mapList.nn, ncol=3, top="Nearest Neighbor Risk Fact
 #----JOINING CENSUS VARIABLES TO FISHNET----
 
 #Point data to fishnet
-census_vars_net <- 
+census_vars_net<- 
   rbind(high_vacancy_bg, low_med_rent_BG, low_inc_BG, white_bg, hisp_bg) %>%
-  st_join(., fishnet, join=st_intersects) %>%
+  st_join(fishnet, ., join=st_intersects) %>%
   st_drop_geometry() %>%
   group_by(uniqueID,Legend) %>%
   summarize(count = n()) %>%
@@ -710,8 +717,20 @@ for(i in census_vars){
     mapTheme()
 }
 
+#GRID SHOWS how many block groups each cell of fishnet intersects with that are defined as each variable. 
+#max interesection is 4,5,and 6. 
+
 do.call(grid.arrange,c(census_mapList, ncol=3, top="Risk Factor by Fishnet"))
 
+#create nearest neighbor count for each cell-which make more sense?
+#i think the categorical  - how many block groups are you touching for each variable - makes more sense 
+# thank the nearest neighbor distance count because you are either in a block group that is defined as low rent or not
+# block groups are arbitrary boundaries created by the US Census that arent exactly representational of actual 
+# spatial grouping in a city- do not represent neighborhood boundaries. even for neighborhoods, it is unrealistic to 
+# expect a neighborhood boundary will or will not contain attributes such as affordability,  vacancy and racial diversity
+# these are also always changing
+##therefore nearest neighbor distance calculations for each fishnet cell is not as indicative of what is happening in reality as a
+#calculation of whether the fishnet is touching a block group with these attributes
 
 census_vars_net.nn <-
   census_vars_net %>%
@@ -743,12 +762,6 @@ for(i in census_vars.nn){
 }
 
 do.call(grid.arrange,c(census_mapList.nn, ncol=3, top="Risk Factor by Fishnet"))
-
-ggplot()+
-  geom_sf(data=city_boundary, fill = NA, color = 'black')+
-  geom_sf(data=census_vars_net, aes(fill=Legend), alpha = .25)+mapTheme()
-G <- ggmap(get_googlemap(center = center, color = 'bw', scale = 4), extent = "device")
-
 
 #----MERGE ALL VARIABLES TO FISHNET----
 
@@ -1028,20 +1041,6 @@ filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>%
 
 
 grid.arrange(
-reg.summary%>%filter(str_detect(Regression, "LOGO"))%>%     
-ggplot() +
-  geom_sf(aes(fill = Prediction, colour = Prediction))+
-  # geom_sf(data = reg.summary, aes(fill = Prediction, colour = Prediction)) +
-  scale_fill_viridis(option = "F", direction = -1) +
-  scale_colour_viridis(option = "F", direction = -1) +
-  facet_wrap(~Regression)+mapTheme(),
-  ggplot() +
-  geom_sf(data = reg.summary, aes(fill = countoverdose, colour = countoverdose))+
-  # geom_sf(data = reg.summary, aes(fill = Prediction, colour = Prediction)) +
-  scale_fill_viridis(option = "F", direction = -1) +
-  scale_colour_viridis(option = "F", direction = -1)+mapTheme(), nrow=1)
-
-grid.arrange(
 reg.summary%>%filter(Regression == "Spatial LOGO-CV: Spatial Process")%>%
   ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
   scale_fill_viridis(option = "F", direction = -1) +
@@ -1062,3 +1061,85 @@ ggplot() +
 # i got close but the first plot is facet wrapped and the second is not, it makes it look really bad
 # the solution might be to create three separate plots instead of facet wrapping the first two
 
+#Test  generalizability across neighborhood
+
+st_drop_geometry(reg.summary) %>%
+  group_by(Regression) %>%
+  mutate(overdose_Decile = ntile(countoverdose, 10)) %>%
+  group_by(Regression, overdose_Decile) %>%
+  summarize(meanObserved = mean(countoverdose, na.rm=T),
+            meanPrediction = mean(Prediction, na.rm=T)) %>%
+  gather(Variable, Value, -Regression, -overdose_Decile) %>%          
+  ggplot(aes(overdose_Decile, Value, shape = Variable)) +
+  geom_point(size = 2) + geom_path(aes(group = overdose_Decile), colour = "black") +
+  scale_shape_manual(values = c(2, 17)) +
+  facet_wrap(~Regression) + xlim(0,10) +
+  labs(title = "Predicted and observed burglary by observed burglary decile")  +
+  plotTheme()
+ 
+#ethnicity context
+blockgroups19 <- get_acs(geography = "block group", variables = c("B01003_001","B03002_012"), 
+                         year=2019, state=04, county=013, geometry=T) %>% 
+  st_transform('EPSG:2224')  %>% 
+  dplyr::select(variable, estimate, GEOID) %>%
+  spread(variable, estimate) %>%
+  rename(TotalPop = B01003_001,
+         HispTotal = B03002_012) %>%
+  mutate(Pct.Hisp = HispTotal/TotalPop,
+         raceContext = ifelse(Pct.Hisp > .5, "Majority_Hispanic", "Majority_Non_Hispanic")) %>%
+  .[council_districts,]
+
+mesa_bg17 <- blockgroups17[city_boundary,]%>%
+  dplyr::select( -NAME, -moe) %>%
+  spread(variable, estimate) %>%
+  dplyr::select(-geometry) %>%
+  rename(TotalPop = B01003_001, 
+         MedHHInc = B19013_001, 
+         MedRent = B25058_001,
+         TotalRent = B25003_003,
+         TotalOwn = B25003_002,
+         VacantUnits = B25004_001,
+         TotalUnits = B25001_001,
+         TotalWhite = B02001_002,
+         BelPov100 = B06012_002,
+         HispTotal = B03002_012)%>% 
+  mutate(area = st_area(geometry),
+         Pct.Vacant = VacantUnits/TotalUnits,
+         Pct.White = TotalWhite/TotalPop,
+         Pct.Hisp = HispTotal/TotalPop)%>%
+  filter(GEOID != '040130101021')%>%
+  filter(GEOID != '1040133184002')%>%
+  filter(GEOID != '040139413002')%>%
+  filter(GEOID != '040138169001')%>%
+  filter(GEOID != '040139413004')%>%
+  filter(GEOID != '040139413003')%>%
+  filter(GEOID != '040133184002')
+
+reg.summary %>%
+  st_centroid() %>%
+  st_join(blockgroups19) %>%
+  na.omit() %>%
+  st_drop_geometry() %>%
+  group_by(Regression, raceContext) %>%
+  summarize(mean.Error = mean(Error, na.rm = T)) %>%
+  spread(raceContext, mean.Error) %>%
+  kable(caption = "Table 2") %>%
+  kable_material()
+
+library(spatstat)
+library(sf)
+
+
+#Kernel Density Plot
+opioid_ppp <- as.ppp(st_coordinates(opioid_data), W = st_bbox(final_net))
+opioid_KD <- spatstat::density.ppp(burg_ppp, 1000)
+
+as.data.frame(opioid_KD) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(final_net)) %>%
+  aggregate(., final_net, mean) %>%
+  ggplot() +
+  geom_sf(aes(fill=value)) +
+  geom_sf(data = sample_n(opioid_data, 1500), size = .5) +
+  scale_fill_viridis(name = "Density") +
+  labs(title = "Kernel density of 2017 burglaries") +
+  mapTheme()
