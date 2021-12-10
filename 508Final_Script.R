@@ -2,6 +2,8 @@
 install.packages('units')
 install.packages('geojsonio')
 install.packages("data.table")
+install.packages("RgoogleMaps")
+install.packages("ggmap")
 #load libraries
 library(tidyverse)
 library(sf)
@@ -25,6 +27,8 @@ library(dplyr)
 library(units)
 library(geojsonio)
 library(data.table)
+library(RgoogleMaps)
+library(ggmap)
 
 options(scipen=999)
 options(tigris_class = "sf")
@@ -32,6 +36,7 @@ options(tigris_class = "sf")
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
 census_api_key("d5e25f48aa48bf3f0766baab06d59402ea032067", overwrite = TRUE)
+register_google(key = "AIzaSyAcot6-KJnKCwIQHJmFO5YDI3TYdXh2Y8I", write = TRUE)
 
 #load functions
 create_regions <- function(data) {
@@ -54,7 +59,6 @@ create_regions <- function(data) {
   }
   group
 }
-
 
 clusterSF <- function(sfpolys, thresh){
   dmat = st_distance(sfpolys)
@@ -88,9 +92,11 @@ mapTheme<- function(base_size = 12, title_size = 16) {
     legend.key = element_rect(fill=NA))
 }
 
+# qmap(location = 'philadelphia', zoom = 14, color = 'bw', legend = 'topleft')
 
 #----CENSUS TRACTS AND CITY BOUNDARY----
 
+VARS<- load_variables(2017, 'acs5')
 #census tracts
 tracts17 <- get_acs(geography = "tract", variables = c("B25026_001","B19013_001","B25058_001",
                                                        "B06012_002", "B25003_003", "B25003_002", "B25004_001" ), 
@@ -118,31 +124,13 @@ tracts17 <- get_acs(geography = "tract", variables = c("B25026_001","B19013_001"
   filter(GEOID != '04013319404')%>%
   filter(GEOID !="04013319906")
 
-#census block groups
-blockgroups17 <- get_acs(geography = "block group", variables = c("B25026_001","B19013_001","B25058_001",
-                                                       "B06012_002", "B25003_003", "B25003_002", "B25004_001" ), 
-                    year=2017, state=04, county=013, geometry=T) %>% 
-  st_transform('EPSG:2224')
-
 #City Boundary
 city_boundary <- st_as_sf(st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/City_Boundary.csv"), 
                           wkt = 'Geometry', crs = 4326, agr = 'constant')%>%
-                  st_transform(st_crs(tracts17))
+  st_transform(st_crs(tracts17))
 
 #filter tracts within city boundary
 mesa_tracts17 <- tracts17[city_boundary,]%>%
-                 dplyr::select( -NAME, -moe) %>%
-                 spread(variable, estimate) %>%
-                 dplyr::select(-geometry) %>%
-                 rename(TotalPop = B25026_001, 
-                        MedHHInc = B19013_001, 
-                        MedRent = B25058_001,
-                        TotalPoverty = B06012_002,
-                        TotalRent = B25003_003,
-                        TotalOwn = B25003_002,
-                        VacantUnits = B25004_001)
-
-mesa_bg17 <- blockgroups17[city_boundary,]%>%
   dplyr::select( -NAME, -moe) %>%
   spread(variable, estimate) %>%
   dplyr::select(-geometry) %>%
@@ -152,27 +140,55 @@ mesa_bg17 <- blockgroups17[city_boundary,]%>%
          TotalPoverty = B06012_002,
          TotalRent = B25003_003,
          TotalOwn = B25003_002,
-         VacantUnits = B25004_001)%>% 
-  mutate(area = st_area(geometry))%>%
+         VacantUnits = B25004_001)
+
+#census block groups
+blockgroups17 <- get_acs(geography = "block group", variables = c("B01003_001","B19013_001","B25058_001", "B25058_001", "B25003_002", "B25004_001", 'B25001_001', 'B25003_003'), 
+                    year=2017, state=04, county=013, geometry=T) %>% 
+  st_transform('EPSG:2224')
+
+mesa_bg17 <- blockgroups17[city_boundary,]%>%
+  dplyr::select( -NAME, -moe) %>%
+  spread(variable, estimate) %>%
+  dplyr::select(-geometry) %>%
+  rename(TotalPop = B01003_001, 
+         MedHHInc = B19013_001, 
+         MedRent = B25058_001,
+         TotalRent = B25003_003,
+         TotalOwn = B25003_002,
+         VacantUnits = B25004_001,
+         TotalUnits = B25001_001)%>% 
+  mutate(area = st_area(geometry),
+         Pct.Vacant = VacantUnits/TotalUnits)%>%
   filter(GEOID != '040130101021')%>%
-  filter(GEOID != '1040133184002')
+  filter(GEOID != '1040133184002')%>%
+  filter(GEOID != '040139413002')%>%
+  filter(GEOID != '040138169001')%>%
+  filter(GEOID != '040139413004')%>%
+  filter(GEOID != '040139413003')%>%
+  filter(GEOID != '040133184002')
 
-#create census variables from block group centroids
-
-mean(mesa_bg17$MedHHInc)
 
 
+#----CENSUS VARIABLES----
 
+#block groups in the bottom quintile = low_income 
+mesa_bg17_HHInc <-mesa_bg17 %>% drop_na(MedHHInc)%>%mutate(HHInc_q5 = q5(MedHHInc))
+low_inc_BG <- mesa_bg17_HHInc%>%filter(HHInc_q5 == 1)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Low Income')
 
-Low_HH_Inc<- st_centroid(Industrial)%>%mutate(Legend = "Low_inc")
+#block groups where med rent is in lower 2 quintile
+mesa_bg17_rent <-mesa_bg17 %>% drop_na(MedRent)%>%mutate(MedRent_q5 = as.numeric(q5(MedRent)))
+low_med_rent_BG <- mesa_bg17_rent%>%filter(MedRent_q5 <=2)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Low Rent')
+
+#block groups where vacancy rate is higher than 25%
+high_vacancy_bg <- mesa_bg17%>%filter(Pct.Vacant >= .25)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'High Vacancy')
 
 ggplot()+
-  geom_sf(data=mesa_tracts17, aes(fill = q5(MedHHInc)),color = 'red')+
-  geom_sf(data=city_boundary, color = 'black', fill= NA)+mapTheme()
+   geom_sf(data = high_vacancy_bg, fill = 'lightblue', color = 'black', alpha = .5)+
+   geom_sf(data = low_inc_BG, fill = 'blue', alpha = .5)+
+   geom_sf(data = low_med_rent_BG, fill = 'purple', alpha = .5)+
+  geom_sf(data = city_boundary, fill=NA, color= 'black')
 
-ggplot()+
-  geom_sf(data=mesa_bg17, fill = 'grey', color = 'red')+
-  geom_sf(data=city_boundary, color = 'black', fill= NA)+mapTheme()
 
 #----OPIOID DATA----
 opioid_data <- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/qufy-tzv6.json")), 
@@ -295,7 +311,7 @@ arts_edu<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-
                     coords = c("longitude", "latitude"),
                     crs = 4326, agr = "constant")%>%
            st_transform(st_crs(tracts17))%>%
-           Filter(property_use %in% c("Mesa Arts Center","Museums","Libraries","Sequoia Charter School"))%>%
+           filter(property_use %in% c("Mesa Arts Center","Museums","Libraries","Sequoia Charter School"))%>%
            mutate(ID = 1:n(), Legend = "Arts and Education")%>%
            dplyr::select(ID, Legend,geometry)
 
@@ -359,7 +375,6 @@ Industrial <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_F
 
 
 zoning<- rbind(Commercial, HD_Residential, LD_Residential, Downtown, Industrial)
-zoning$zones <- factor(zoning$zones, levels=c('High Density Res','Low Density Res','Commercial','Downtown','Industrial'))
 
 #ZonePlot1
 # ggplot()+
@@ -423,6 +438,7 @@ ggplot()+
                    legend.title = element_text(color = '#233d4d'),
                    plot.title = element_text(color = '#233d4d', size = 30),
                    panel.grid = element_blank())
+
 
 
 #----MAKE FISHNET----
@@ -524,7 +540,7 @@ HDR_center<- st_centroid(HD_Residential)%>%mutate(Legend = "High Density Residen
 DT_center<- st_centroid(Downtown)%>%mutate(Legend = "Downtown")
 
 
-#join to fishnet + plot
+#join zones to fishnet + plot
 zone_vars_net <- 
   rbind(DT_center, HDR_center, LDR_center, Comm_center, Ind_center) %>%
   st_join(., fishnet, join=st_within) %>%
@@ -556,7 +572,7 @@ do.call(grid.arrange,c(zone_mapList, ncol=3, top="Density of Zone Type by Fishne
 
 #----JOIN POINT VARIABLES TO FISHNET----
 
-#nearest neighbor function for point data
+#Point data to fishnet
 point_vars_net <- 
   rbind(arts_edu,cccenter,mesa_police_fire,parks,public_housing,vacant) %>%
   st_join(., fishnet, join=st_within) %>%
@@ -588,6 +604,7 @@ do.call(grid.arrange,c(point_mapList, ncol=3, top="Risk Factor by Fishnet"))
 
 #----JOIN POINT NN VARIABLES TO FISHNET----
 
+#join nearest neighbor to fishnet
 point_vars_net.nn <-
   point_vars_net %>%
   mutate(
@@ -621,8 +638,74 @@ for(i in point_vars.nn){
 
 do.call(grid.arrange,c(point_mapList.nn, ncol=3, top="Nearest Neighbor Risk Factors by Fishnet"))
 
+#----JOINING CENSUS VARIABLES TO FISHNET----
 
-#MERGE VARIABLE NETS 
+#Point data to fishnet
+census_vars_net <- 
+  rbind(high_vacancy_bg, low_med_rent_BG, low_inc_BG) %>%
+  st_join(., fishnet, join=st_intersects) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID,Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet) %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
+
+
+census_vars_net.long <- 
+  gather(census_vars_net, Variable, value, -geometry, -uniqueID)
+census_vars <- unique(census_vars_net.long$Variable)
+census_mapList <- list()
+
+for(i in census_vars){
+  census_mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(census_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()
+}
+
+do.call(grid.arrange,c(census_mapList, ncol=3, top="Risk Factor by Fishnet"))
+
+
+census_vars_net.nn <-
+  census_vars_net %>%
+  mutate(
+    high_vacancy.nn =
+      nn_function(st_coordinates(st_centroid(census_vars_net)), st_coordinates(st_centroid(high_vacancy_bg)),3),
+    low_med_rent.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(low_med_rent_BG)),3),
+    low_inc.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(low_inc_BG)),3))%>%
+  dplyr::select(ends_with(".nn"),uniqueID, geometry)
+
+census_vars_net.nn.long <- 
+  gather(census_vars_net.nn, Variable, value, -geometry, -uniqueID)
+census_vars.nn <- unique(census_vars_net.nn.long$Variable)
+census_mapList.nn <- list()
+
+for(i in census_vars.nn){
+  census_mapList.nn[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(census_vars_net.nn.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()
+}
+
+do.call(grid.arrange,c(census_mapList.nn, ncol=3, top="Risk Factor by Fishnet"))
+
+ggplot()+
+  geom_sf(data=city_boundary, fill = NA, color = 'black')+
+  geom_sf(data=census_vars_net, aes(fill=Legend), alpha = .25)+mapTheme()
+G <- ggmap(get_googlemap(center = center, color = 'bw', scale = 4), extent = "device")
+
+
+#----MERGE ALL VARIABLES TO FISHNET----
 
 vars_net<- cbind(point_vars_net,(st_drop_geometry(zone_vars_net)%>%dplyr::select(-uniqueID)))
 vars_net<- cbind(vars_net,
@@ -630,10 +713,9 @@ vars_net<- cbind(vars_net,
                     dplyr::select(-uniqueID)))
 
 
-#----LOCAL MORAN'S I----
-
 final_net <-
   left_join(opioid_net, st_drop_geometry(vars_net), by="uniqueID") 
+
 
 final_net <-
   st_centroid(final_net) %>%
@@ -642,6 +724,9 @@ final_net <-
   left_join(dplyr::select(final_net, geometry, uniqueID)) %>%
   st_sf() %>%
   na.omit()
+
+
+#----LOCAL MORAN'S I----
 
 ## generates warnings from PROJ issues
 ## {spdep} to make polygon to neighborhoods... 
@@ -703,6 +788,7 @@ ggplot() +
            subtitle = 'Mesa, AZ') +
       mapTheme()
 
+#Plot census tract joined to fishnet
 ggplot() +
   geom_sf(data = final_net, 
           aes(fill=GEOID), colour='grey75', size =.25) +
