@@ -978,6 +978,7 @@ error_by_reg_and_fold %>% ggplot(aes(MAE))+
        x= 'Mean Absolute Erorr', y = 'Count')+plotTheme()
 
 #-----SPATIAL PLOTS-----
+
 ggplot() +
   geom_sf(data = reg.summary, aes(fill = Prediction, colour = Prediction)) +
   scale_fill_viridis(option = "F", direction = -1) +
@@ -1025,4 +1026,39 @@ filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>%
   kable(caption = 'Table 2') %>%
   kable_material() 
 
+
+grid.arrange(
+reg.summary%>%filter(str_detect(Regression, "LOGO"))%>%     
+ggplot() +
+  geom_sf(aes(fill = Prediction, colour = Prediction))+
+  # geom_sf(data = reg.summary, aes(fill = Prediction, colour = Prediction)) +
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1) +
+  facet_wrap(~Regression)+mapTheme(),
+  ggplot() +
+  geom_sf(data = reg.summary, aes(fill = countoverdose, colour = countoverdose))+
+  # geom_sf(data = reg.summary, aes(fill = Prediction, colour = Prediction)) +
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1)+mapTheme(), nrow=1)
+
+grid.arrange(
+reg.summary%>%filter(Regression == "Spatial LOGO-CV: Spatial Process")%>%
+  ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1)+
+  labs(title='Spatial LOGO-CV: Spatial Process')+mapTheme()+theme(panel.border=element_blank()),
+reg.summary%>%filter(Regression == "Spatial LOGO-CV: Just Risk Factors")%>%
+  ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1)+
+  labs(title='Spatial LOGO-CV: Just Risk Factors')+mapTheme()+theme(panel.border=element_blank()),
+ggplot() +
+  geom_sf(data = reg.summary, aes(fill = countoverdose, colour = countoverdose))+
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1)+
+  labs(title='Observed Overdoses')+mapTheme()+theme(panel.border=element_blank()),nrow=1)
+
+# left off here trying to create a plot that compares both LOGO regression types to the observed overdose incidents 
+# i got close but the first plot is facet wrapped and the second is not, it makes it look really bad
+# the solution might be to create three separate plots instead of facet wrapping the first two
 
