@@ -92,7 +92,36 @@ mapTheme<- function(base_size = 12, title_size = 16) {
     legend.key = element_rect(fill=NA))
 }
 
-# qmap(location = 'philadelphia', zoom = 14, color = 'bw', legend = 'topleft')
+crossValidate<- function(dataset, id, dependentVariable, indVariables) {
+  
+  allPredictions <- data.frame()
+  cvID_list <- unique(dataset[[id]])
+  
+  for (i in cvID_list) {
+    
+    thisFold <- i
+    cat("This hold out fold is", thisFold, "\n")
+    
+    fold.train <- filter(dataset, dataset[[id]] != thisFold) %>% as.data.frame() %>% 
+      dplyr::select(id, geometry, indVariables, dependentVariable)
+    fold.test  <- filter(dataset, dataset[[id]] == thisFold) %>% as.data.frame() %>% 
+      dplyr::select(id, geometry, indVariables, dependentVariable)
+    
+    regression <-
+      glm(countoverdose ~ ., family = "poisson", 
+          data = fold.train %>% 
+            dplyr::select(-geometry, -id))
+    
+    thisPrediction <- 
+      mutate(fold.test, Prediction = predict(regression, fold.test, type = "response"))
+    
+    allPredictions <-
+      rbind(allPredictions, thisPrediction)
+    
+  }
+  return(st_sf(allPredictions))
+}
+
 
 #----CENSUS TRACTS AND CITY BOUNDARY----
 
@@ -143,7 +172,7 @@ mesa_tracts17 <- tracts17[city_boundary,]%>%
          VacantUnits = B25004_001)
 
 #census block groups
-blockgroups17 <- get_acs(geography = "block group", variables = c("B01003_001","B19013_001","B25058_001", "B25058_001", "B25003_002", "B25004_001", 'B25001_001', 'B25003_003'), 
+blockgroups17 <- get_acs(geography = "block group", variables = c("B01003_001","B19013_001","B25058_001", "B25058_001", "B25003_002", "B25004_001", 'B25001_001', 'B25003_003', 'B02001_002','B06012_002E','B03002_012'), 
                     year=2017, state=04, county=013, geometry=T) %>% 
   st_transform('EPSG:2224')
 
@@ -157,9 +186,14 @@ mesa_bg17 <- blockgroups17[city_boundary,]%>%
          TotalRent = B25003_003,
          TotalOwn = B25003_002,
          VacantUnits = B25004_001,
-         TotalUnits = B25001_001)%>% 
+         TotalUnits = B25001_001,
+         TotalWhite = B02001_002,
+         BelPov100 = B06012_002,
+         HispTotal = B03002_012)%>% 
   mutate(area = st_area(geometry),
-         Pct.Vacant = VacantUnits/TotalUnits)%>%
+         Pct.Vacant = VacantUnits/TotalUnits,
+         Pct.White = TotalWhite/TotalPop,
+         Pct.Hisp = HispTotal/TotalPop)%>%
   filter(GEOID != '040130101021')%>%
   filter(GEOID != '1040133184002')%>%
   filter(GEOID != '040139413002')%>%
@@ -168,7 +202,7 @@ mesa_bg17 <- blockgroups17[city_boundary,]%>%
   filter(GEOID != '040139413003')%>%
   filter(GEOID != '040133184002')
 
-
+# Mesa <- get_map("mesa, arizona", maptype = "toner-2010")
 
 #----CENSUS VARIABLES----
 
@@ -183,9 +217,16 @@ low_med_rent_BG <- mesa_bg17_rent%>%filter(MedRent_q5 <=2)%>%dplyr::select(GEOID
 #block groups where vacancy rate is higher than 25%
 high_vacancy_bg <- mesa_bg17%>%filter(Pct.Vacant >= .25)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'High Vacancy')
 
+#block groups where majority hispanic
+hisp_bg <- mesa_bg17%>%filter(Pct.Hisp >= .5)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Majority Hispanic')
+
+#block groups where vast majority white
+white_bg <- mesa_bg17%>%filter(Pct.White >= .85)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Majority White')
+
+
 ggplot()+
-   geom_sf(data = high_vacancy_bg, fill = 'lightblue', color = 'black', alpha = .5)+
-   geom_sf(data = low_inc_BG, fill = 'blue', alpha = .5)+
+   geom_sf(data = white_bg, fill = 'lightblue', color = 'black', alpha = .5)+
+   geom_sf(data = hisp_bg, fill = 'blue', alpha = .5)+
    geom_sf(data = low_med_rent_BG, fill = 'purple', alpha = .5)+
   geom_sf(data = city_boundary, fill=NA, color= 'black')
 
@@ -642,7 +683,7 @@ do.call(grid.arrange,c(point_mapList.nn, ncol=3, top="Nearest Neighbor Risk Fact
 
 #Point data to fishnet
 census_vars_net <- 
-  rbind(high_vacancy_bg, low_med_rent_BG, low_inc_BG) %>%
+  rbind(high_vacancy_bg, low_med_rent_BG, low_inc_BG, white_bg, hisp_bg) %>%
   st_join(., fishnet, join=st_intersects) %>%
   st_drop_geometry() %>%
   group_by(uniqueID,Legend) %>%
@@ -680,7 +721,11 @@ census_vars_net.nn <-
     low_med_rent.nn =
       nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(low_med_rent_BG)),3),
     low_inc.nn =
-      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(low_inc_BG)),3))%>%
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(low_inc_BG)),3),
+    maj.hisp.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(hisp_bg)),3),
+    maj.white.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(white_bg)),3))%>%
   dplyr::select(ends_with(".nn"),uniqueID, geometry)
 
 census_vars_net.nn.long <- 
@@ -708,10 +753,12 @@ G <- ggmap(get_googlemap(center = center, color = 'bw', scale = 4), extent = "de
 #----MERGE ALL VARIABLES TO FISHNET----
 
 vars_net<- cbind(point_vars_net,(st_drop_geometry(zone_vars_net)%>%dplyr::select(-uniqueID)))
-vars_net<- cbind(vars_net,
-                 (st_drop_geometry(point_vars_net.nn)%>%
-                    dplyr::select(-uniqueID)))
-
+vars_net<- cbind(vars_net,(st_drop_geometry(point_vars_net.nn))%>%
+                   dplyr::select(-uniqueID))
+vars_net<- cbind(vars_net,(st_drop_geometry(census_vars_net))%>%
+                   dplyr::select(-uniqueID))
+vars_net<- cbind(vars_net,(st_drop_geometry(census_vars_net.nn))%>%
+                    dplyr::select(-uniqueID))
 
 final_net <-
   left_join(opioid_net, st_drop_geometry(vars_net), by="uniqueID") 
@@ -788,14 +835,18 @@ ggplot() +
            subtitle = 'Mesa, AZ') +
       mapTheme()
 
-#Plot census tract joined to fishnet
+colourCount = length(unique(final_net$GEOID))
+getPalette = colorRampPalette(brewer.pal(12, "Paired"))
+
+#Plot census blockgroups joined to fishnet
 ggplot() +
   geom_sf(data = final_net, 
           aes(fill=GEOID), colour='grey75', size =.25) +
-  scale_fill_viridis(option = 'F', direction = -1, discrete = TRUE) +
-  labs(title= 'Tracts ',
+  scale_fill_manual(values = getPalette(colourCount))+
+  labs(title= 'Block Groups ',
        subtitle = 'Mesa, AZ') +
   mapTheme()+theme(legend.position = 'none')
+
 
 #----CORRELATION PLOTS----
 
@@ -816,8 +867,162 @@ ggplot(correlation.long, aes(Value, countoverdose)) +
   geom_text(data = correlation.cor, aes(label = paste("r =", round(correlation, 2))),
             x=-Inf, y=Inf, vjust = 1.5, hjust = -.1) +
   geom_smooth(method = "lm", se = FALSE, colour = "black") +
-  facet_wrap(~Variable, ncol = 4, scales = "free") +
+  facet_wrap(~Variable, ncol = 5, scales = "free") +
   labs(title = "Narcotics Incidents count as a function of risk factors",
        caption = "fig 5") +
   plotTheme()
+
+#---- HISTOGRAMS----
+
+final_net %>%
+  ggplot(aes(countoverdose,))+
+  geom_histogram(bins = 50, colour="black", fill = '#223843') +
+  scale_x_continuous(breaks = seq(0, 100, by = 20)) + 
+  scale_y_continuous(breaks = seq(0,1500, by = 200))+
+  labs(title="Distribution of Overdose Occurances", subtitle = "Mesa, AZ",
+       x="Overdose Occurance Count", y="Frequency", 
+       caption = "fig 6") +plotTheme()
+
+#----CROSS-VALIDATED POISSON REGRESSION----
+
+#generalizability is important 1) to test model performance on new data and 2) on different spatial group contexts
+# like neighborhoods. 
+
+#Spatial cross-validation
+# LOGO-CV
+#hold out one local area, train the model on the remaining n-1 areas, predict the hold out, record goodness of fit
+
+colnames(final_net)
+# View(crossValidate)
+
+## define the variables we want
+
+#Just Risk Factors
+reg.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Industrial", "Downtown", 
+                 "Park.nn", "Child.Crisis.Center.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing.nn", "High.Vacancy", "Low.Income", "Low.Rent",
+                 "Majority.White", "Majority.Hispanic")
+
+#Include Local Moran's I Statistic
+reg.ss.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Industrial", "overdose.isSig", "overdose.isSig.dist", "Downtown", 
+                 "Park.nn", "Child.Crisis.Center.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing.nn", "High.Vacancy", "Low.Income", "Low.Rent",
+                 "Majority.White", "Majority.Hispanic")
+
+## RUN REGRESSIONS
+
+#### K-fold
+#Just Risk Factors
+reg.CV <- crossValidate(
+  dataset = final_net,
+  id = "cvID",                           
+  dependentVariable = "countoverdose",
+  indVariables = reg.vars) %>%
+  dplyr::select(cvID, countoverdose, Prediction, geometry)
+
+#Spatial Process
+reg.ss.CV <- crossValidate(
+  dataset = final_net,
+  id = "cvID",                           
+  dependentVariable = "countoverdose",
+  indVariables = reg.ss.vars) %>%
+  dplyr::select(cvID, countoverdose, Prediction, geometry)
+
+
+#### Spatial LOGO-CV
+#Just Risk Factors
+reg.spatialCV <- crossValidate(
+  dataset = final_net,
+  id = "GEOID",                           
+  dependentVariable = "countoverdose",
+  indVariables = reg.vars) %>%
+  dplyr::select(cvID = GEOID, countoverdose, Prediction, geometry)
+
+
+#Spatial Process
+reg.ss.spatialCV <- crossValidate(
+  dataset = final_net,
+  id = "GEOID",                           
+  dependentVariable = "countoverdose",
+  indVariables = reg.ss.vars) %>%
+  dplyr::select(cvID = GEOID, countoverdose, Prediction, geometry)
+
+#### bind
+
+reg.summary <- 
+  rbind(
+    mutate(reg.CV,        Error = Prediction - countoverdose,
+           Regression = "Random k-fold CV: Just Risk Factors"),
+    mutate(reg.ss.CV,        Error = Prediction - countoverdose,
+           Regression = "Random k-fold CV: Spatial Process"),
+    mutate(reg.spatialCV, Error = Prediction - countoverdose,
+           Regression = "Spatial LOGO-CV: Just Risk Factors"),
+    mutate(reg.ss.spatialCV, Error = Prediction - countoverdose,
+           Regression = "Spatial LOGO-CV: Spatial Process")) %>%
+  st_sf() 
+
+# calculate errors by NEIGHBORHOOD
+error_by_reg_and_fold <- 
+  reg.summary  %>%
+  group_by(Regression, cvID) %>% 
+  summarize(Mean_Error = mean(Prediction - countoverdose, na.rm = T),
+            MAE = mean(abs(Mean_Error), na.rm = T),
+            SD_MAE = mean(abs(Mean_Error), na.rm = T)) %>%
+  ungroup()
+
+
+#----HISTOGRAMS----
+error_by_reg_and_fold %>% ggplot(aes(MAE))+
+  geom_histogram(bins=30, color = 'black', fill = '#f5af7b')+
+  facet_wrap(~Regression)+
+  geom_vline(xintercept= 0)+scale_x_continuous(breaks=seq(0,8,by=1))+
+  labs(title='Distribution of MAE', subtitle='k-fold cross validation vs. LOGO-CV',
+       x= 'Mean Absolute Erorr', y = 'Count')+plotTheme()
+
+#-----SPATIAL PLOTS-----
+ggplot() +
+  geom_sf(data = reg.summary, aes(fill = Prediction, colour = Prediction)) +
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1) +
+  facet_wrap(~Regression) +  
+  labs(title="Narcotics Incidents Errors", subtitle = "Random K-Fold and      Spatial Cross Validation", caption = "fig #") +
+  mapTheme()
+
+#---TABLE----
+
+st_drop_geometry(error_by_reg_and_fold) %>%
+  group_by(Regression) %>% 
+  summarize(Mean_MAE = round(mean(MAE), 2),
+            SD_MAE = round(sd(MAE), 2)) %>%
+  kable(caption = 'Table 1') %>%
+  kable_material() 
+
+error_by_reg_and_fold%>%
+  filter(str_detect(Regression, 'LOGO'))%>%
+  ggplot()+
+  geom_sf(aes(fill=MAE))+
+  facet_wrap(~Regression)+
+  scale_fill_viridis(option = "F", direction = -1) +
+  labs(title='Distribution of MAE', subtitle='k-fold cross validation vs. LOGO-CV',
+       x= 'Mean Absolute Erorr', y = 'Count')+mapTheme()
+
+
+#----NEIGHBORHOOD WEIGHTS-----
+  
+neighborhood.weights <-
+  filter(error_by_reg_and_fold, Regression == "Spatial LOGO-CV: Spatial Process") %>%
+  group_by(cvID) %>%
+  poly2nb(as_Spatial(.), queen=TRUE) %>%
+  nb2listw(., style="W", zero.policy=TRUE)
+
+filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>% 
+  st_drop_geometry() %>%
+  group_by(Regression) %>%
+  summarize(Morans_I = moran.mc(abs(Mean_Error), neighborhood.weights, 
+                                nsim = 999, zero.policy = TRUE, 
+                                na.action=na.omit)[[1]],
+            p_value = moran.mc(abs(Mean_Error), neighborhood.weights, 
+                               nsim = 999, zero.policy = TRUE, 
+                               na.action=na.omit)[[3]])%>%
+  kable(caption = 'Table 2') %>%
+  kable_material() 
+
 
