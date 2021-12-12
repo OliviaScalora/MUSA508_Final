@@ -6,7 +6,7 @@
 # install.packages("ggmap")
 # install.packages('rstudioapi')
 # install.packages('ggpubr')
-
+install.packages('prettydoc')
 # #load libraries
 library(tidyverse)
 library(sf)
@@ -34,6 +34,7 @@ library(data.table)
 library(RgoogleMaps)
 library(rstudioapi)
 library(ggpubr)
+library(prettydoc)
 
 options(scipen=999)
 options(tigris_class = "sf")
@@ -328,14 +329,23 @@ ggplot()+
 # highway <- st_as_sf(read.socrata("https://data.mesaaz.gov/resource/y3aj-3i5y.csv"),wkt = 'Geometry', 
 #                      crs = 4326, agr = "constant")%>%filter(SpeedLimit = '65')%>%dplyr::select('Full Street Name', Geometry, SpeedLimit)
 #   st_transform(st_crs(tracts17))
-#----CRIME DATA----
+
+#----TRANSPORTATION----
+
+light_rail <- st_read("data/Lightrail/LightRailStation.shp")%>%
+  st_transform(st_crs(tracts17))%>%mutate(ID = 1:n(), Legend = "lightrail")%>%
+  dplyr::select(ID, Legend,geometry)%>%st_centroid()
+light_rail <- light_rail [city_boundary,]
+
+# ggplot()+
+#   geom_sf(data = city_boundary, color = 'black', fill = NA)+
+#   geom_sf(data =  light_rail_buffer, color = 'red')
+# join with point data
+ 
+ #----CRIME DATA----
 
 #FILTER MISDEMEAMORS FROM FELONIES
 crime <- read.socrata("https://data.mesaaz.gov/resource/39rt-2rfj.csv")
-
-
-
-
 crime <- st_as_sf(na.omit(crime), 
                         coords = c("longitude", "latitude"), 
                         crs = 4326, agr = "constant")%>%
@@ -392,8 +402,17 @@ felony<- crime%>%
 #         mutate(ID = 1:n(), Legend = "Park")%>%
 #         dplyr::select(ID, Legend, geometry)
 
-parks<- st_as_sf(na.omit(read.csv('data/Parks_Locations_And_Amenities.csv')))
 parks<-na.omit(read.csv('data/Parks_Locations_And_Amenities.csv'))
+parks<- st_as_sf(parks,coords = c("Longitude", "Latitude"),crs = 4326, agr = "constant")%>%
+                         st_transform(st_crs(tracts17))%>%mutate(ID = 1:n(), Legend = "Park")%>%
+                        dplyr::select(ID, Legend,geometry)
+parks <- parks [city_boundary,]
+
+
+#TEST PLOT
+ # ggplot()+
+ #   geom_sf(data = city_boundary, color = 'black', fill = NA)+
+ #   geom_sf(data = parks, color = 'green')
 
 #police and fire stations
 mesa_police_fire<-st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
@@ -743,7 +762,7 @@ do.call(grid.arrange,c(crime_mapList, ncol=2, top="Risk Factor by Fishnet"))
 
 #Point data to fishnet
 point_vars_net <- 
-  rbind(arts_edu,cccenter,mesa_police_fire,parks,public_housing,vacant) %>%
+  rbind(arts_edu,cccenter,mesa_police_fire,parks,public_housing,vacant,parks, light_rail) %>%
   st_join(., fishnet, join=st_within) %>%
   st_drop_geometry() %>%
   group_by(uniqueID,Legend) %>%
@@ -788,7 +807,9 @@ point_vars_net.nn <-
     Public.Housing.nn =
       nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(public_housing),3),
     Vacant.Property.nn =
-      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(vacant),3))%>%
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(vacant),3),
+    Lightrail.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(light_rail),3))%>%
   dplyr::select(ends_with(".nn"),uniqueID, geometry)
 
 point_vars_net.nn.long <- 
@@ -805,9 +826,9 @@ for(i in point_vars.nn){
     mapTheme()
 }
 
-do.call(grid.arrange,c(point_mapList.nn, ncol=3, top="Nearest Neighbor Risk Factors by Fishnet"))
+do.call(grid.arrange,c(point_mapList.nn, ncol=4, top="Nearest Neighbor Risk Factors by Fishnet"))
 
-#----JOINING CENSUS VARIABLES TO FISHNET----
+ #----JOINING CENSUS VARIABLES TO FISHNET----
 
 #Point data to fishnet
 census_vars_net<- 
@@ -965,6 +986,10 @@ final_net <- final_net %>%
                        st_coordinates(st_centroid(filter(final_net, 
                                            overdose.isSig == 1))),k = 1))
 
+final_net.long <- 
+  gather(final_net, Variable, value, -geometry, -uniqueID)
+
+
 #Plot distance to nearest significant hotspot
 ggplot() +
       geom_sf(data = filter(final_net.long, Variable == "overdose.isSig.dist"), 
@@ -1027,16 +1052,12 @@ colnames(final_net)
 #Just Risk Factors
 reg.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential",  "Downtown", 
                  "Park.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
-                 "Majority.White", "Majority.Hispanic","Child.Crisis.Center", "Industrial", "misdemeanor", "felony")
+                 "Majority.White", "Majority.Hispanic","Child.Crisis.Center", "Industrial", "misdemeanor", "felony", "lightrail")
 
 #Include Local Moran's I Statistic
 reg.ss.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Downtown", 
                  "Park.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
-                 "Majority.White", "Majority.Hispanic","Child.Crisis.Center", "Industrial", "misdemeanor", "felony", "overdose.isSig.dist", "overdose.isSig")
-
-
-# "Child.Crisis.Center", "Industrial",
-
+                 "Majority.White", "Majority.Hispanic","Child.Crisis.Center", "Industrial", "misdemeanor", "felony","lightrail", "overdose.isSig.dist", "overdose.isSig")
 
 
 ## RUN REGRESSIONS

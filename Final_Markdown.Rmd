@@ -1,0 +1,839 @@
+---
+title: 'Opioid Overdose Risk Prediction'
+subtitle: "MUSA 508 Final"
+author: "Olivia Scalora, Hasa Reddy"
+date: "December, 2021"
+output:
+  html_document:
+    toc: true 
+    toc_float: true 
+    toc_depth: 6
+    theme: sandstone
+    highlight: textmate
+    code_folding: "hide"
+    css: style2.css
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+#SETUP
+knitr::opts_chunk$set(warning=FALSE)
+
+library(tidyverse)
+library(sf)
+library(RSocrata)
+library(ggmap)
+library(viridis)
+library(spatstat)
+library(raster)
+library(spdep)
+library(FNN)
+library(grid)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(tidycensus)
+library(RColorBrewer)
+library(ggthemes)
+library(sp)
+library(rgeos)
+library(maptools)
+library(dplyr)
+library(units)
+library(geojsonio)
+library(prettydoc)
+
+options(scipen=999)
+options(tigris_class = "sf")
+
+census_api_key("d5e25f48aa48bf3f0766baab06d59402ea032067", overwrite = TRUE) 
+
+#LOAD FUNCTIONS
+
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+#change cross validate function
+crossValidate<- function(dataset, id, dependentVariable, indVariables) {
+  
+  allPredictions <- data.frame()
+  cvID_list <- unique(dataset[[id]])
+  
+  for (i in cvID_list) {
+    
+    thisFold <- i
+    cat("This hold out fold is", thisFold, "\n")
+    
+    fold.train <- filter(dataset, dataset[[id]] != thisFold) %>% as.data.frame() %>% 
+      dplyr::select(id, geometry, indVariables, dependentVariable)
+    fold.test  <- filter(dataset, dataset[[id]] == thisFold) %>% as.data.frame() %>% 
+      dplyr::select(id, geometry, indVariables, dependentVariable)
+    
+    regression <-
+      glm(countoverdose ~ ., family = "poisson", 
+          data = fold.train %>% 
+            dplyr::select(-geometry, -id))
+    
+    thisPrediction <- 
+      mutate(fold.test, Prediction = predict(regression, fold.test, type = "response"))
+    
+    allPredictions <-
+      rbind(allPredictions, thisPrediction)
+    
+  }
+  return(st_sf(allPredictions))
+}
+
+
+mapTheme<- function(base_size = 12, title_size = 16) {
+  theme(
+    text = element_text( color = "black"),
+    plot.title = element_text(size = title_size,colour = "black"),
+    plot.subtitle=element_text(face="italic"),
+    plot.caption=element_text(hjust=0),
+    axis.ticks = element_blank(),
+    panel.background = element_blank(),axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    strip.text.x = element_text(size = 14),
+    legend.key = element_rect(fill=NA))
+}
+
+```
+
+
+# INTRODUCTION
+
+a. Motivate the analysis – “What is the use case; why would someone want to replicate your analysis and why would they use this approach?”
+	b. Describe the data you used.
+	c. Describe your exploratory analysis using maps and plots.
+	d. What is the spatial or space/time process?
+d. Describe your modeling approach and show how you arrived at your final model.
+e. Validate your model with cross-validation and describe how your predictions are useful (accuracy vs. generalizability).
+f. Provide additional maps and data visualizations to show that your model is useful.
+g. Talk about how your analysis meets the use case you set out to address.
+h. What could you do to make the analysis better?
+
+
+# DATA 
+
+```{r wrangle.data, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+#----CENSUS TRACTS, BLOCKGROUPS AND CITY BOUNDARY----
+
+#CENSUS TRACTS 
+tracts17 <- get_acs(geography = "tract", variables = c("B25026_001","B19013_001","B25058_001",
+                                                       "B06012_002", "B25003_003", "B25003_002", "B25004_001" ), 
+                    year=2017, state=04, county=013, geometry=T) %>% 
+  st_transform('EPSG:2224')%>%
+  filter(GEOID != '04013010102')%>%
+  filter(GEOID != '04013941300')%>%
+  filter(GEOID != '04013422308')%>%
+  filter(GEOID != '04013422307')%>%
+  filter(GEOID != '04013422508')%>%
+  filter(GEOID != '04013422506')%>%
+  filter(GEOID != '04013422622')%>%
+  filter(GEOID != '04013318400')%>%
+  filter(GEOID != '04013420100')%>%
+  filter(GEOID != '04013810300')%>%
+  filter(GEOID != '04013523104')%>%
+  filter(GEOID != '04013420110')%>%
+  filter(GEOID != '04013816900')%>%
+  filter(GEOID != '04013815902')%>%
+  filter(GEOID != '04013810800')%>%
+  filter(GEOID != '04013815600')%>%
+  filter(GEOID != '04013815200')%>%
+  filter(GEOID != '04013319904')%>%
+  filter(GEOID != '04013319402')%>%
+  filter(GEOID != '04013319404')%>%
+  filter(GEOID !="04013319906")
+
+#CITY BOUNDARY
+city_boundary <- st_as_sf(st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/City_Boundary.csv"), 
+                          wkt = 'Geometry', crs = 4326, agr = 'constant')%>%
+  st_transform(st_crs(tracts17))
+
+#filter tracts within city boundary
+mesa_tracts17 <- tracts17[city_boundary,]%>%
+  dplyr::select( -NAME, -moe) %>%
+  spread(variable, estimate) %>%
+  dplyr::select(-geometry) %>%
+  rename(TotalPop = B25026_001, 
+         MedHHInc = B19013_001, 
+         MedRent = B25058_001,
+         TotalPoverty = B06012_002,
+         TotalRent = B25003_003,
+         TotalOwn = B25003_002,
+         VacantUnits = B25004_001)
+
+#BLOCK GROUPS
+blockgroups17 <- get_acs(geography = "block group", variables = c("B01003_001","B19013_001","B25058_001",
+                                                                  "B25003_003", "B25003_002", "B25004_001", "B25001_001",
+                                                                  "B02001_002", "B03002_012"), 
+                         year=2017, state=04, county=013, geometry=T) %>% st_transform('EPSG:2224')
+
+mesa_bg17 <- blockgroups17[city_boundary,]%>%
+  dplyr::select( -NAME, -moe) %>%
+  spread(variable, estimate) %>%
+  dplyr::select(-geometry) %>%
+  rename(TotalPop = B01003_001, 
+         MedHHInc = B19013_001, 
+         MedRent = B25058_001,
+         TotalRent = B25003_003,
+         TotalOwn = B25003_002,
+         VacantUnits = B25004_001,
+         TotalUnits = B25001_001,
+         TotalWhite = B02001_002,
+         HispTotal = B03002_012)%>% 
+  mutate(area = st_area(geometry),
+         Pct.Vacant = VacantUnits/TotalUnits,
+         Pct.White = TotalWhite/TotalPop,
+         Pct.Hisp = HispTotal/TotalPop)%>%
+  filter(GEOID != '040130101021')%>%
+  filter(GEOID != '1040133184002')%>%
+  filter(GEOID != '040139413002')%>%
+  filter(GEOID != '040138169001')%>%
+  filter(GEOID != '040139413004')%>%
+  filter(GEOID != '040139413003')%>%
+  filter(GEOID != '040133184002')
+
+#----CENSUS VARIABLES----
+
+#block groups with household income in the bottom quintile= low_income 
+mesa_bg17_HHInc <-mesa_bg17 %>% drop_na(MedHHInc)%>%mutate(HHInc_q5 = q5(MedHHInc))
+low_inc_BG <- mesa_bg17_HHInc%>%filter(HHInc_q5 == 1)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Low Income')
+
+#block groups where median rent is in lower 2 quintile
+mesa_bg17_rent <-mesa_bg17 %>% drop_na(MedRent)%>%mutate(MedRent_q5 = as.numeric(q5(MedRent)))
+low_med_rent_BG <- mesa_bg17_rent%>%filter(MedRent_q5 <=2)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Low Rent')
+
+#block groups where vacancy rate is higher than 25%
+high_vacancy_bg <- mesa_bg17%>%filter(Pct.Vacant >= .25)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'High Vacancy')
+
+#block groups where majority hispanic
+hisp_bg <- mesa_bg17%>%filter(Pct.Hisp >= .5)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Majority Hispanic')
+
+#block groups where vast majority white
+white_bg <- mesa_bg17%>%filter(Pct.White >= .85)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Majority White')
+
+
+#----OPIOID DATA----
+opioid_data <- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/qufy-tzv6.json")), 
+                        coords = c("longitude", "latitude"), 
+                        crs = 4326, agr = "constant")%>%
+               st_transform(st_crs(tracts17))%>%filter(location.longitude != -112.225)
+opioid_data <- opioid_data%>%mutate(point = paste(opioid_data$location.latitude, opioid_data$location.longitude))
+
+#count number of overdose occurances at each 1/3 mile interval point and join count column to opioid data set
+count <- count(opioid_data,point)
+opioid_data <- (st_join(opioid_data, count, all.x = all)%>%dplyr::select(-point.x,-point.y)%>%
+  rename(count = n))
+
+#filter points that are within city boundary
+opioid_data <- opioid_data[city_boundary,]
+
+opioid_data17 <- opioid_data%>%filter(year=='2017')
+
+
+#----TRANSPORTATION----
+
+light_rail <- st_read("data/Lightrail/LightRailStation.shp")%>%
+  st_transform(st_crs(tracts17))%>%mutate(ID = 1:n(), Legend = "lightrail")%>%
+  dplyr::select(ID, Legend,geometry)%>%st_centroid()
+light_rail <- light_rail [city_boundary,]
+
+
+ #----CRIME DATA----
+
+
+crime <- read.socrata("https://data.mesaaz.gov/resource/39rt-2rfj.csv")
+crime <- st_as_sf(na.omit(crime), 
+                        coords = c("longitude", "latitude"), 
+                        crs = 4326, agr = "constant")%>%
+          st_transform(st_crs(tracts17))%>%filter(report_year == '2017')
+crime  <- crime[city_boundary,]
+
+#MISDEMEANOR CRIMES
+misdemeanor<- crime%>%
+  filter(national_incident_based_crime_reporting_description %in% 
+           c("DISORDERLY CONDUCT","SIMPLE ASSAULT","FALSE PRETENSES/SWINDLE/CONFIDENCE GAME","TRESPASS OF REAL PROPERTY",
+              "CURFEW/LOITERING/VAGRANCY VIOLATION","POCKET-PICKING","DISORDERLY CONDUCT - DV","PURSE-SNATCHING",
+              "FALSE PRETENSES/SWINDLE/CONFIDENCE","PEEPING TOM","SUSPICION","NOT REPOTABLE","NOT REPORTABLE","SHOPLIFTING",
+              "INTIMIDATION","UNDER FALSE PRETENSES", "OTHER OFFENSES", "OTHER OFFENSE","ALL OTHER OFFENSES", "STOLEN PROPERTY OFFENSE", 
+              "DESTRUCTION/DAMAGE/VANDALISM OF PROPERTY", "RUNAWAY", "COUNTERFEITING/FORGERY", "FAMILY OFFENSES, NONVIOLENT"))%>%
+        mutate(Legend = 'misdemeanor')
+
+#NON DRUG RELATED FELONY
+felony<- crime%>%
+  filter(!national_incident_based_crime_reporting_description %in% 
+           c("DISORDERLY CONDUCT","SIMPLE ASSAULT","FALSE PRETENSES/SWINDLE/CONFIDENCE GAME","TRESPASS OF REAL PROPERTY",
+             "CURFEW/LOITERING/VAGRANCY VIOLATION","POCKET-PICKING","DISORDERLY CONDUCT - DV","PURSE-SNATCHING",
+             "FALSE PRETENSES/SWINDLE/CONFIDENCE","PEEPING TOM","SUSPICION","NOT REPOTABLE","NOT REPORTABLE","SHOPLIFTING",
+             "INTIMIDATION","UNDER FALSE PRETENSES", "OTHER OFFENSES", "OTHER OFFENSE","ALL OTHER OFFENSES", "STOLEN PROPERTY OFFENSE", 
+             "DESTRUCTION/DAMAGE/VANDALISM OF PROPERTY", "RUNAWAY", "COUNTERFEITING/FORGERY", "FAMILY OFFENSES, NONVIOLENT", 
+             "DRUG/NARCOTIC VIOLATION","DRUG EQUIPMENT VIOLATION"))%>% mutate(Legend = 'felony')
+
+#----CITY PROPERTIES----
+
+#Parks 
+parks<-na.omit(read.csv('data/Parks_Locations_And_Amenities.csv'))
+parks<- st_as_sf(parks,coords = c("Longitude", "Latitude"),crs = 4326, agr = "constant")%>%
+                         st_transform(st_crs(tracts17))%>%mutate(ID = 1:n(), Legend = "Park")%>%
+                        dplyr::select(ID, Legend,geometry)
+parks <- parks [city_boundary,]
+
+#police and fire stations
+mesa_police_fire<-st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                            coords = c("longitude", "latitude"),
+                            crs = 4326, agr = "constant")%>%
+                 st_transform(st_crs(tracts17))%>%
+                 filter(property_use %in% c("Public Safety--Fire/Police", "Park/Public Safety"))%>%
+                 mutate(ID = 1:n(),Legend = "Police&Fire Station")%>%
+                 dplyr::select(ID,Legend,geometry)
+
+
+#vacant lots
+vacant<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                            coords = c("longitude", "latitude"),
+                            crs = 4326, agr = "constant")%>%
+         st_transform(st_crs(tracts17))%>%
+         filter(property_use %in% c("Vacant", "Vacant (ADOT remnant)"))%>%
+         mutate(ID = 1:n(), Legend = "Vacant Property")%>%
+         dplyr::select(ID, Legend,geometry)
+
+
+#child crisis center
+cccenter<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                  coords = c("longitude", "latitude"),
+                  crs = 4326, agr = "constant")%>%
+          st_transform(st_crs(tracts17))%>%
+          filter(property_use %in% "Child Crisis Center")%>%
+          mutate(ID = 1:n(),Legend = "Child Crisis Center")%>%
+          dplyr::select(ID, Legend,geometry)
+
+#arts and education centerS
+arts_edu<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                    coords = c("longitude", "latitude"),
+                    crs = 4326, agr = "constant")%>%
+           st_transform(st_crs(tracts17))%>%
+           filter(property_use %in% c("Mesa Arts Center","Museums","Libraries","Sequoia Charter School"))%>%
+           mutate(ID = 1:n(), Legend = "Arts and Education")%>%
+           dplyr::select(ID, Legend,geometry)
+
+
+#public housing
+public_housing<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+                    coords = c("longitude", "latitude"),
+                    crs = 4326, agr = "constant")%>%
+                st_transform(st_crs(tracts17))%>%
+                filter(property_use %in% c("Housing", "Escobedo Housing", "NSP", "Residential Property"))%>%
+                mutate(ID = 1:n(), Legend = "Public Housing")%>%
+                dplyr::select(ID, Legend,geometry)
+
+
+#----ZONING----
+
+#High Density residential
+HD_Residential <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% c("RM-3","RM-2","RM-4"))%>%
+  dplyr::select(objectid, geometry)%>%mutate(zone = 'HD')
+
+#Low Density Residential- "single residence" zoning
+LD_Residential <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% c("RS-15","RS-35","RS-43","RS-6","RS-90","RS-9","PC","RSL-2.5","RSL-4.5","RSL-2.5"))%>%
+  dplyr::select(objectid, geometry)%>%mutate(zone = 'LD')
+
+#Commercial
+Commercial <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% c("GC","LC","NC","OC","RSL-4.0"))%>%
+  dplyr::select(objectid, geometry)%>%mutate(zone = 'com')
+
+#Downtown
+Downtown <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% c("DC","DB-2","DB-1", "DR-2", "DR-3", "DR-1"))%>%
+  dplyr::select(objectid, geometry)%>%mutate(zone = 'DT')
+
+#Industrial
+Industrial <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_Final/main/Data/Zoning%20Districts.geojson")%>%
+  st_transform(st_crs(tracts17))%>%
+  filter(zoning %in% c("LI", "HI", "AG", "AG"))%>%
+  dplyr::select(objectid, geometry)%>%mutate(zone = 'ind')
+
+
+zoning<- rbind(Commercial, HD_Residential, LD_Residential, Downtown, Industrial)
+zoning$zone <- factor(zoning$zone, levels = c('HD','LD','DT','com','ind'))
+
+
+
+```
+
+<div class="plot">
+```{r zone.point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE,fig.width = 8.5, fig.height = 6.7}
+
+#ZonePlot1
+ggplot()+
+  geom_sf(data= zoning,
+          aes(fill= zone),
+          color = NA,)+
+  geom_sf(data = opioid_data17%>%distinct(geometry, .keep_all = TRUE),
+          aes(size = count),
+          color = '#e5383b', alpha = .5)+
+  scale_fill_manual(values = c("#4281a4","#9cafb7", "#db534b", "#fe938c", "#ead2ac"),
+                    labels=c('High Density Res','Low Density Res','Downtown','Commercial','Industrial')) +
+  scale_size_continuous(breaks=seq(1, 4, by=1),
+                        range = c(1,20))+
+  geom_sf(data=city_boundary,
+          color = 'black',
+          size = 1,
+          fill = NA)+
+  guides(size = guide_legend(override.aes = list(size = c(1,4,8,10))))+
+  labs(size = 'Count at nearest\n 1/3 mi. interval', fill = 'Zone Type',
+       caption = 'fig.',
+       title = 'Zoning and Opioid Overdoses',
+       subtitle= 'Mesa, Az; 2017')+
+  mapTheme()+theme(panel.background = element_rect(fill = "transparent", color = "transparent"),
+                   legend.background = element_rect(fill="transparent", color = "transparent"),
+                   plot.background = element_rect(fill = "transparent", color = "transparent"),
+                   legend.text = element_text(color='#233d4d'),
+                   legend.title = element_text(color = '#233d4d'),
+                   plot.title = element_text(color = '#233d4d', size = 22),
+                   panel.grid = element_blank())
+
+```
+</div>
+
+```{r fishnet, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+ #----MAKE FISHNET----
+
+fishnet <- 
+  st_make_grid(city_boundary,
+               cellsize = 1760, 
+               square = TRUE) %>%
+  .[city_boundary] %>%  
+  st_sf() %>%
+  mutate(uniqueID = rownames(.))
+
+#join overdoses to the fishnet
+opioid_net <- 
+  dplyr::select(opioid_data17) %>% 
+  mutate(countoverdose = 1) %>% 
+  aggregate(., fishnet, sum) %>%
+  mutate(countoverdose = replace_na(countoverdose, 0),
+         uniqueID = rownames(.),
+         cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
+```
+
+<div class="plot">
+```{r fishnet.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+#opioid fishnet plot
+ggplot() +
+  geom_sf(data = opioid_net, aes(fill = countoverdose), color= NA)+
+  scale_fill_viridis(option = 'F', direction = -1) +
+  labs(title = "Count of Overdoses for the fishnet",
+       subtitle = "Mesa, AZ",
+       caption = "fig.") +
+  mapTheme()
+```
+</div>
+
+```{r zone.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+#----JOIN ZONING DATA TO FISHNET----
+
+#Industrial
+#Create polygon centroid
+Ind_center<- st_centroid(Industrial)%>%mutate(Legend = "Industrial")
+
+
+#Commercial
+#Create polygon centroid
+Comm_center<- st_centroid(Commercial)%>%mutate(Legend = "Commercial")
+
+
+#low density residential
+#Create polygon centroid
+LDR_center<- st_centroid(LD_Residential)%>%mutate(Legend = "Low Density Residential")
+
+
+# high density residential polygons 
+#Create polygon centroid
+HDR_center<- st_centroid(HD_Residential)%>%mutate(Legend = "High Density Residential")
+
+
+# Downtown
+#Create polygon centroid
+DT_center<- st_centroid(Downtown)%>%mutate(Legend = "Downtown")
+
+
+#join zones to fishnet + plot
+zone_vars_net <- 
+  rbind(DT_center, HDR_center, LDR_center, Comm_center, Ind_center) %>%
+  st_join(., fishnet, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID, Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet) %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
+
+zone_vars_net.long <- 
+  gather(zone_vars_net, Variable, value, -geometry, -uniqueID)
+zone_vars <- unique(zone_vars_net.long$Variable)
+zone_mapList <- list()
+
+for(i in zone_vars){
+  zone_mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(zone_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()+ theme(legend.position="bottom",
+                      legend.key.size = unit(.3, 'cm'))
+  }
+```
+
+<div class="plot">
+```{r zone.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+do.call(grid.arrange,c(zone_mapList, ncol=3, top="Density of Zone Type by Fishnet"))
+
+```
+</div>
+
+```{r crime.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+#----JOIN CRIME DATA TO FISHNET----
+crime_vars_net <- 
+  rbind(misdemeanor, felony) %>%
+  st_join(., fishnet, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID,Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet) %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
+
+crime_vars_net.long <- 
+  gather(crime_vars_net, Variable, value, -geometry, -uniqueID)
+crime_vars <- unique(crime_vars_net.long$Variable)
+crime_mapList <- list()
+
+for(i in crime_vars){
+  crime_mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(crime_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()+ theme(legend.position="bottom")
+}
+```
+
+<div class="plot">
+```{r crime.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+do.call(grid.arrange,c(crime_mapList, ncol=2, top="Risk Factor by Fishnet"))
+
+```
+</div>
+
+```{r point.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+#----JOIN POINT VARIABLES TO FISHNET----
+
+#Point data to fishnet
+point_vars_net <- 
+  rbind(arts_edu,cccenter,mesa_police_fire,parks,public_housing,vacant,parks, light_rail) %>%
+  st_join(., fishnet, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID,Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet) %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
+
+point_vars_net.long <- 
+  gather(point_vars_net, Variable, value, -geometry, -uniqueID)
+point_vars <- unique(point_vars_net.long$Variable)
+point_mapList <- list()
+
+for(i in point_vars){
+  point_mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(point_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()+ theme(legend.position="bottom")
+}
+
+```
+
+<div class="plot">
+```{r point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+do.call(grid.arrange,c(point_mapList, ncol=3, top="Risk Factor by Fishnet"))
+
+```
+</div>
+
+```{r point.nn.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+#----JOIN POINT NN VARIABLES TO FISHNET----
+
+#join nearest neighbor to fishnet
+point_vars_net.nn <-
+  point_vars_net %>%
+  mutate(
+    Park.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(parks),3),
+    Child.Crisis.Center.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(cccenter),3),
+    Arts.and.Education.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(arts_edu),3),
+    Police.Fire.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(mesa_police_fire),3),
+    Public.Housing.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(public_housing),3),
+    Vacant.Property.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(vacant),3),
+    Lightrail.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(light_rail),3))%>%
+  dplyr::select(ends_with(".nn"),uniqueID, geometry)
+
+point_vars_net.nn.long <- 
+  gather(point_vars_net.nn, Variable, value, -geometry, -uniqueID)
+point_vars.nn <- unique(point_vars_net.nn.long$Variable)
+point_mapList.nn <- list()
+
+for(i in point_vars.nn){
+  point_mapList.nn[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(point_vars_net.nn.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()+ theme(legend.position="bottom")
+}
+
+do.call(grid.arrange,c(point_mapList.nn, ncol=4, top="Nearest Neighbor Risk Factors by Fishnet"))
+```
+
+<div class="plot">
+```{r point.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+do.call(grid.arrange,c(point_mapList.nn, ncol=4, top="Nearest Neighbor Risk Factors by Fishnet"))
+```
+</div>
+
+```{r census.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+ #----JOINING CENSUS VARIABLES TO FISHNET----
+
+#Point data to fishnet
+census_vars_net<- 
+  rbind(high_vacancy_bg, low_med_rent_BG, low_inc_BG, white_bg, hisp_bg) %>%
+  st_join(fishnet, ., join=st_intersects) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID,Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet) %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
+
+census_vars_net.long <- 
+  gather(census_vars_net, Variable, value, -geometry, -uniqueID)
+census_vars <- unique(census_vars_net.long$Variable)
+census_mapList <- list()
+
+for(i in census_vars){
+  census_mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(census_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()+ theme(legend.position="bottom")
+}
+
+#GRID SHOWS how many block groups each cell of fishnet intersects with that are defined as each variable. 
+#max interesection is 4,5,and 6. 
+```
+
+<div class="plot">
+```{r census.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+do.call(grid.arrange,c(census_mapList, ncol=3, top="Risk Factor by Fishnet"))
+
+```
+</div>
+
+```{r census.nn.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+ #----JOINING CENSUS VARIABLES TO FISHNET----
+
+
+census_vars_net.nn <-
+  census_vars_net %>%
+  mutate(
+    high_vacancy.nn =
+      nn_function(st_coordinates(st_centroid(census_vars_net)), st_coordinates(st_centroid(high_vacancy_bg)),3),
+    low_med_rent.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(low_med_rent_BG)),3),
+    low_inc.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(low_inc_BG)),3),
+    maj.hisp.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(hisp_bg)),3),
+    maj.white.nn =
+      nn_function(st_coordinates(st_centroid(point_vars_net)), st_coordinates(st_centroid(white_bg)),3))%>%
+  dplyr::select(ends_with(".nn"),uniqueID, geometry)
+
+census_vars_net.nn.long <- 
+  gather(census_vars_net.nn, Variable, value, -geometry, -uniqueID)
+census_vars.nn <- unique(census_vars_net.nn.long$Variable)
+census_mapList.nn <- list()
+
+for(i in census_vars.nn){
+  census_mapList.nn[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(census_vars_net.nn.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()+ theme(legend.position="bottom")
+}
+```
+
+<div class="plot">
+```{r census.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+do.call(grid.arrange,c(census_mapList.nn, ncol=3, top="Risk Factor by Fishnet"))
+```
+</div>
+
+
+```{r merge.vars, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+#----MERGE ALL VARIABLES TO FISHNET----
+
+vars_net<- cbind(point_vars_net,(st_drop_geometry(zone_vars_net)%>%
+                    dplyr::select(-uniqueID)))
+vars_net<- cbind(vars_net,(st_drop_geometry(point_vars_net.nn))%>%
+                   dplyr::select(-uniqueID))
+vars_net<- cbind(vars_net,(st_drop_geometry(census_vars_net))%>%
+                   dplyr::select(-uniqueID))
+vars_net<- cbind(vars_net,(st_drop_geometry(census_vars_net.nn))%>%
+                    dplyr::select(-uniqueID))
+vars_net<- cbind(vars_net,(st_drop_geometry(crime_vars_net))%>%
+                   dplyr::select(-uniqueID))
+
+final_net <-
+  left_join(opioid_net, st_drop_geometry(vars_net), by="uniqueID") 
+
+final_net <-
+  st_centroid(final_net) %>%
+  st_join(dplyr::select(mesa_tracts17, GEOID), by = "uniqueID") %>%
+  st_drop_geometry() %>%
+  left_join(dplyr::select(final_net, geometry, uniqueID)) %>%
+  st_sf() %>%
+  na.omit()
+
+```
+
+```{r local.moran, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+## generates warnings from PROJ issues
+## {spdep} to make polygon to neighborhoods... 
+final_net.nb <- poly2nb(as_Spatial(final_net), queen=TRUE)
+## .. and neighborhoods to list of weigths
+final_net.weights <- nb2listw(final_net.nb, style="W", zero.policy=TRUE)
+#print(final_net.weights, zero.policy=TRUE)
+## see ?localmoran
+local_morans <- localmoran(final_net$countoverdose, final_net.weights, zero.policy=TRUE) %>% 
+  as.data.frame()
+
+
+# join local Moran's I results to fishnet
+
+final_net.localMorans <- 
+  cbind(local_morans, as.data.frame(final_net)) %>% 
+  st_sf() %>%
+  dplyr::select(overdose_count = countoverdose, 
+                Local_Morans_I = Ii, 
+                P_Value = `Pr(z != E(Ii))`) %>%
+  mutate(Significant_Hotspots = ifelse(P_Value <= 0.001, 1, 0)) %>%
+  gather(Variable, Value, -geometry)
+
+vars <- unique(final_net.localMorans$Variable)
+varList <- list()
+
+for(i in vars){
+  varList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(final_net.localMorans, Variable == i), 
+            aes(fill = Value), colour=NA) +
+    scale_fill_viridis(option = "F", direction = -1) +
+    labs(title=i) +
+    mapTheme() + theme(legend.position="bottom")}
+
+final_net <- final_net %>% 
+  mutate(overdose.isSig = 
+           ifelse(local_morans[,5] <= 0.001, 1, 0)) %>%
+  mutate(overdose.isSig.dist = 
+           nn_function(st_coordinates(st_centroid(final_net)),
+                       st_coordinates(st_centroid(filter(final_net, 
+                                           overdose.isSig == 1))),k = 1))
+final_net.long <- 
+  gather(final_net, Variable, value, -geometry, -uniqueID)
+
+```
+
+<div class="plot">
+```{r local.moran.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+do.call(grid.arrange,c(varList, ncol = 4, top = "Local Morans I statistics, Mesa, AZ Overdose Incidents", bottom = "fig 4"))
+
+ggplot() +
+      geom_sf(data = filter(final_net.long, Variable == "overdose.isSig.dist"), 
+              aes(fill=as.numeric(value)), colour=NA) +
+      scale_fill_viridis(option = 'F', direction = -1) +
+      labs(fill = 'Distance (ft)',
+           title= 'Distance to Significant Overdose Hotspot',
+           subtitle = 'Mesa, AZ') +
+      mapTheme()
+
+
+```
+</div>
+
+
+
+
+# POISSON REGRESSION
+
+
+# CROSS VALIDATION
+
+
+# CODE APPENDIX
+```{r get-labels, echo = FALSE}
+labs = knitr::all_labels()
+labs = setdiff(labs, c("setup", "get-labels"))
+```
+
+```{r all-code, ref.label=labs, eval=FALSE}
+```

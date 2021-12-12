@@ -1,0 +1,30 @@
+
+html {
+font-family: 'Helvetica';
+}
+
+body {
+  background-color: #f0efeb;
+}
+
+#nextsteps {
+}
+
+.emphasized {
+   font-size: 1.2em;
+}
+
+h1 {
+font-family: 'Helvetica';
+}
+h2 {
+font-family: 'Helvetica';
+color: #2b2005;
+}
+
+div.plot {
+          font-size: 1.2em;
+          padding: 1vw;
+          border-radius: 15px;
+          background-color: white;
+          }
