@@ -40,7 +40,7 @@ options(tigris_class = "sf")
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
-census_api_key("d5e25f48aa48bf3f0766baab06d59402ea032067", overwrite = TRUE)
+census_api_key("d5e25f48aa48bf3f0766baab06d59402ea032067", overwrite = TRUE) 
 
 #load functions
 create_regions <- function(data) {
@@ -1275,7 +1275,23 @@ rbind(opioid_KDE_sf , opioid_risk_sf) %>%
        subtitle="2017 Overdose Risk Predictions; 2018 Overdose", caption = "fig 8") +
   mapTheme()
 
+#calculates the rate of 2018 overdose points by risk category and model type
+# well fit model should show that the risk predictions capture a greater share of 2018 overdoses
+# in the highest risk category relative to the kernel density
 
+rbind(opioid_KDE_sf , opioid_risk_sf) %>%
+  st_set_geometry(NULL) %>% na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category) %>%
+  group_by(label, Risk_Category) %>%
+  summarize(countoverdose = sum(Value)) %>%
+  ungroup() %>%
+  group_by(label) %>%
+  mutate(Rate_of_test_set_overdose = countoverdose / sum(countoverdose)) %>%
+  ggplot(aes(Risk_Category,Rate_of_test_set_overdose)) +
+  geom_bar(aes(fill=label), position="dodge", stat="identity") +
+  scale_fill_manual(values=c("#4281a4", "#fe938c"))+
+  labs(title = "Risk prediction vs. Kernel density, 2018 burglaries") +
+  plotTheme() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
 
-
+#uh oh... model is not performing well. higher kernel density in the highest risk category is not what we want
 
