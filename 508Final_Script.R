@@ -1,5 +1,5 @@
 #Setup -------------------
-install.packages('ggmap')
+# install.packages('ggmap')
 # install.packages('geojsonio')
 # install.packages("data.table")
 # install.packages("RgoogleMaps")
@@ -129,8 +129,8 @@ crossValidate<- function(dataset, id, dependentVariable, indVariables) {
 
 
 #----CENSUS TRACTS AND CITY BOUNDARY----
-
-VARS<- load_variables(2017, 'acs5')
+#
+# VARS<- load_variables(2017, 'acs5')
 #census tracts
 tracts17 <- get_acs(geography = "tract", variables = c("B25026_001","B19013_001","B25058_001",
                                                        "B06012_002", "B25003_003", "B25003_002", "B25004_001" ), 
@@ -328,22 +328,72 @@ ggplot()+
 # highway <- st_as_sf(read.socrata("https://data.mesaaz.gov/resource/y3aj-3i5y.csv"),wkt = 'Geometry', 
 #                      crs = 4326, agr = "constant")%>%filter(SpeedLimit = '65')%>%dplyr::select('Full Street Name', Geometry, SpeedLimit)
 #   st_transform(st_crs(tracts17))
+#----CRIME DATA----
 
+#FILTER MISDEMEAMORS FROM FELONIES
+crime <- read.socrata("https://data.mesaaz.gov/resource/39rt-2rfj.csv")
+
+
+
+
+crime <- st_as_sf(na.omit(crime), 
+                        coords = c("longitude", "latitude"), 
+                        crs = 4326, agr = "constant")%>%
+  st_transform(st_crs(tracts17))%>%filter(report_year == '2017')
+
+
+crime  <- crime [city_boundary,]
+# unique(crime$national_incident_based_crime_reporting_description)
+
+misdemeanor<- crime%>%
+  filter(national_incident_based_crime_reporting_description %in% 
+           c("DISORDERLY CONDUCT","SIMPLE ASSAULT","FALSE PRETENSES/SWINDLE/CONFIDENCE GAME","TRESPASS OF REAL PROPERTY",
+              "CURFEW/LOITERING/VAGRANCY VIOLATION","POCKET-PICKING","DISORDERLY CONDUCT - DV","PURSE-SNATCHING",
+              "FALSE PRETENSES/SWINDLE/CONFIDENCE","PEEPING TOM","SUSPICION","NOT REPOTABLE","NOT REPORTABLE","SHOPLIFTING",
+              "INTIMIDATION","UNDER FALSE PRETENSES", "OTHER OFFENSES", "OTHER OFFENSE","ALL OTHER OFFENSES", "STOLEN PROPERTY OFFENSE", 
+              "DESTRUCTION/DAMAGE/VANDALISM OF PROPERTY", "RUNAWAY", "COUNTERFEITING/FORGERY", "FAMILY OFFENSES, NONVIOLENT"))%>%
+  mutate(Legend = 'misdemeanor')
+
+
+#filter felonies unrelated to drug crimes - 
+# unique(felony$crime_type)
+#NON DRUG RELATED FELONY
+felony<- crime%>%
+  filter(!national_incident_based_crime_reporting_description %in% 
+           c("DISORDERLY CONDUCT","SIMPLE ASSAULT","FALSE PRETENSES/SWINDLE/CONFIDENCE GAME","TRESPASS OF REAL PROPERTY",
+             "CURFEW/LOITERING/VAGRANCY VIOLATION","POCKET-PICKING","DISORDERLY CONDUCT - DV","PURSE-SNATCHING",
+             "FALSE PRETENSES/SWINDLE/CONFIDENCE","PEEPING TOM","SUSPICION","NOT REPOTABLE","NOT REPORTABLE","SHOPLIFTING",
+             "INTIMIDATION","UNDER FALSE PRETENSES", "OTHER OFFENSES", "OTHER OFFENSE","ALL OTHER OFFENSES", "STOLEN PROPERTY OFFENSE", 
+             "DESTRUCTION/DAMAGE/VANDALISM OF PROPERTY", "RUNAWAY", "COUNTERFEITING/FORGERY", "FAMILY OFFENSES, NONVIOLENT", "DRUG/NARCOTIC VIOLATION",
+             "DRUG EQUIPMENT VIOLATION"))%>%
+  mutate(Legend = 'felony')
+# unique(felony$national_incident_based_crime_reporting_description)
+
+
+
+
+#TEST PLOT
+# ggplot()+
+#   geom_sf(data = city_boundary, color = 'black', fill = NA)+
+#   geom_sf(data = misdemeanor, color = 'red')+
+#   geom_sf(data = felony, color = 'blue')+mapTheme()
 
 #----CITY PROPERTIES----
 
 #parks
-parks<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
-                 coords = c("longitude", "latitude"),
-                 crs = 4326, agr = "constant")%>%
-        st_transform(st_crs(tracts17))%>%
-        filter(property_use %in%  
-                 c("Park Facilities","Park/Utility Facilities", "Parks/ Utility Facilities", "Parks",
-                   "Parks ", "Urban Garden - Lease Non Profit","Parsk/ Utility  Facilities", "Pocket Park",
-                   "Park/Public Safety", "Golf Course", "Citrus Grove"))%>%
-        mutate(ID = 1:n(), Legend = "Park")%>%
-        dplyr::select(ID, Legend, geometry)
+# parks<- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
+#                  coords = c("longitude", "latitude"),
+#                  crs = 4326, agr = "constant")%>%
+#         st_transform(st_crs(tracts17))%>%
+#         filter(property_use %in%  
+#                  c("Park Facilities","Park/Utility Facilities", "Parks/ Utility Facilities", "Parks",
+#                    "Parks ", "Urban Garden - Lease Non Profit","Parsk/ Utility  Facilities", "Pocket Park",
+#                    "Park/Public Safety", "Golf Course", "Citrus Grove"))%>%
+#         mutate(ID = 1:n(), Legend = "Park")%>%
+#         dplyr::select(ID, Legend, geometry)
 
+parks<- st_as_sf(na.omit(read.csv('data/Parks_Locations_And_Amenities.csv')))
+parks<-na.omit(read.csv('data/Parks_Locations_And_Amenities.csv'))
 
 #police and fire stations
 mesa_police_fire<-st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/xms2-ya86.json")),
@@ -491,7 +541,7 @@ ggplot()+
   geom_sf(data= zoning,
           aes(fill= zone),
           color = NA,)+
-  geom_sf(data = opioid_data17,
+  geom_sf(data = opioid_data17%>%distinct(geometry, .keep_all = TRUE),
           aes(size = count),
           color = '#e5383b', alpha = .5)+
   scale_fill_manual(values = c("#4281a4","#9cafb7", "#db534b", "#fe938c", "#ead2ac"),
@@ -658,6 +708,37 @@ for(i in zone_vars){
 
 do.call(grid.arrange,c(zone_mapList, ncol=3, top="Density of Zone Type by Fishnet"))
 
+#----JOIN CRIME DATA TO FISHNET----
+
+crime_vars_net <- 
+  rbind(misdemeanor, felony) %>%
+  st_join(., fishnet, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID,Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet) %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
+
+crime_vars_net.long <- 
+  gather(crime_vars_net, Variable, value, -geometry, -uniqueID)
+crime_vars <- unique(crime_vars_net.long$Variable)
+crime_mapList <- list()
+
+for(i in crime_vars){
+  crime_mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(crime_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()
+}
+
+do.call(grid.arrange,c(crime_mapList, ncol=2, top="Risk Factor by Fishnet"))
+
 #----JOIN POINT VARIABLES TO FISHNET----
 
 #Point data to fishnet
@@ -812,14 +893,16 @@ vars_net<- cbind(vars_net,(st_drop_geometry(census_vars_net))%>%
                    dplyr::select(-uniqueID))
 vars_net<- cbind(vars_net,(st_drop_geometry(census_vars_net.nn))%>%
                     dplyr::select(-uniqueID))
+vars_net<- cbind(vars_net,(st_drop_geometry(crime_vars_net))%>%
+                   dplyr::select(-uniqueID))
 
 final_net <-
   left_join(opioid_net, st_drop_geometry(vars_net), by="uniqueID") 
 
-
+  
 final_net <-
   st_centroid(final_net) %>%
-  st_join(dplyr::select(mesa_bg17, GEOID), by = "uniqueID") %>%
+  st_join(dplyr::select(mesa_tracts17, GEOID), by = "uniqueID") %>%
   st_drop_geometry() %>%
   left_join(dplyr::select(final_net, geometry, uniqueID)) %>%
   st_sf() %>%
@@ -920,8 +1003,8 @@ ggplot(correlation.long, aes(Value, countoverdose)) +
 
 final_net %>%
   ggplot(aes(countoverdose,))+
-  geom_histogram(bins = 50, colour="black", fill = '#223843') +
-  scale_x_continuous(breaks = seq(0, 100, by = 20)) + 
+  geom_histogram(bins = 10, colour="black", fill = '#223843') +
+  scale_x_continuous(breaks = seq(0, 20, by = 2)) + 
   scale_y_continuous(breaks = seq(0,1500, by = 200))+
   labs(title="Distribution of Overdose Occurances", subtitle = "Mesa, AZ",
        x="Overdose Occurance Count", y="Frequency", 
@@ -942,14 +1025,19 @@ colnames(final_net)
 ## define the variables we want
 
 #Just Risk Factors
-reg.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Industrial", "Downtown", 
-                 "Park.nn", "Child.Crisis.Center", "Arts.and.Education.nn", "Police.Fire.Station", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
-                 "Majority.White", "Majority.Hispanic")
+reg.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential",  "Downtown", 
+                 "Park.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
+                 "Majority.White", "Majority.Hispanic","Child.Crisis.Center", "Industrial", "misdemeanor", "felony")
 
 #Include Local Moran's I Statistic
-reg.ss.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Industrial", "Downtown", 
-                 "Park.nn", "Child.Crisis.Center", "Arts.and.Education.nn", "Police.Fire.Station", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
-                 "Majority.White", "Majority.Hispanic", "overdose.isSig.dist", "overdose.isSig")
+reg.ss.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Downtown", 
+                 "Park.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
+                 "Majority.White", "Majority.Hispanic","Child.Crisis.Center", "Industrial", "misdemeanor", "felony", "overdose.isSig.dist", "overdose.isSig")
+
+
+# "Child.Crisis.Center", "Industrial",
+
+
 
 ## RUN REGRESSIONS
 
@@ -1112,7 +1200,7 @@ st_drop_geometry(reg.summary) %>%
 
 
 #Test  generalizability across neighborhood
-#Get 2019 Data
+#Get 2018 Data
 blockgroups19 <- get_acs(geography = "block group", variables = c("B01003_001","B03002_012"), 
                          year=2019, state=04, county=013, geometry=T) %>% 
   st_transform('EPSG:2224')  %>% 
@@ -1263,18 +1351,19 @@ rbind(opioid_KDE_sf , opioid_risk_sf) %>%
   geom_sf(aes(fill = Risk_Category), colour = NA) +
   geom_sf(data = opioid_data18%>%distinct(geometry, .keep_all=TRUE),
           aes(size = count),
-          color = 'black',
-          alpha = .35)+
+          color = '#fffaf2',
+          alpha = .45)+
   scale_size_continuous(breaks=seq(1, 75, by=15),
                         range = c(1,15))+
   guides(size= guide_legend(title = "2018 Overdoses",
                             override.aes = list(size = c(3,6,9,12,15))))+
   facet_wrap(~label, ) +
-  scale_fill_viridis(option = "F", direction = -1, discrete = TRUE, alpha = .75) +
+  scale_fill_viridis(option = "F", direction =-1, discrete = TRUE, alpha = .75) +
   labs(title="Comparison of Kernel Density and Risk Predictions",
        subtitle="2017 Overdose Risk Predictions; 2018 Overdose", caption = "fig 8") +
   mapTheme()
 
+#
 #calculates the rate of 2018 overdose points by risk category and model type
 # well fit model should show that the risk predictions capture a greater share of 2018 overdoses
 # in the highest risk category relative to the kernel density
