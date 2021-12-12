@@ -41,7 +41,6 @@ options(tigris_class = "sf")
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
 census_api_key("d5e25f48aa48bf3f0766baab06d59402ea032067", overwrite = TRUE)
-register_google(key = "AIzaSyBxeFrC2A-d2XQ_3mqIN8JUbZcE5236Khc")
 
 #load functions
 create_regions <- function(data) {
@@ -257,6 +256,7 @@ opioid_data <- opioid_data[city_boundary,]
 
 
 opioid_data17 <- opioid_data%>%filter(year=='2017')
+opioid_data18 <- opioid_data%>%filter(year=='2018')
 opioid_data20 <- opioid_data%>%filter(year=='2020')
 
 #----PLAYING AROUND WITH PLOTS-----
@@ -276,7 +276,7 @@ ggplot()+
           fill = NA,
           color = "black")+
   scale_fill_brewer(palette=1)+
-  geom_sf(data = opioid_data17,
+  geom_sf(data = opioid_data17%>%distinct(geometry, .keep_all=TRUE),
           aes(size = count),
           color = 'red',
           alpha = .25)+
@@ -284,7 +284,7 @@ ggplot()+
                          range = c(1,20))+
   guides(color= guide_legend(), 
           size= guide_legend(title = 'count',
-                             override.aes = list(size = c(1,3,5,7,11))),
+                             override.aes = list(size = c(1,5,10,15,20))),
          fill = guide_legend(title = 'Total Living Below Poverty'))+ 
   labs(subtitle = "2017")+
   geom_sf(data=city_boundary,
@@ -296,7 +296,7 @@ ggplot()+
           fill = NA,
           color = "black")+
   scale_fill_brewer(palette=1)+
-  geom_sf(data = opioid_data20,
+  geom_sf(data = opioid_data20%>%distinct(geometry, .keep_all=TRUE),
           aes(size = count),
           color = 'red',
           alpha = .25)+
@@ -304,7 +304,7 @@ ggplot()+
                         range = c(1,20))+
   guides(color= guide_legend(), 
           size= guide_legend(title = 'count',
-                             override.aes = list(size = c(1,3,5,7,11))),
+                             override.aes = list(size = c(1,5,10,15,20))),
          )+ 
   labs(subtitle = "2020")+
   geom_sf(data=city_boundary,
@@ -316,49 +316,6 @@ ggplot()+
 #               mutate(point = as.character(geometry))
 
 
-#kernel density plot 2017-2021
-
- p1<- ggplot()+
-    geom_sf(data=city_boundary, fill='#22192b', color='grey65')+
-    stat_density2d(data= data.frame(st_coordinates(opioid_data17)),
-                   aes(X,Y, fill=..level..,alpha=..level..),
-                   size=0.01, bins=40, geom='polygon')+
-    scale_fill_viridis(option = 'F',  direction = 1) +
-    scale_alpha(range=c(0.00,0.35), guide='none')+
-    geom_sf(data = opioid_data17,
-            aes(size = count),
-            color = '#fffaf2',
-            alpha = .1)+
-    guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
-    labs(subtitle = '2017',
-         fill = 'Density',
-         size = 'Count at nearest\n 1/3 mi. interval')+
-   scale_size_continuous(breaks=seq(1, 61, by=15),
-                         range = c(1,10))+ mapTheme()+theme(legend.key.size = unit(.75, 'cm'))
- 
- p2<- ggplot()+
-    geom_sf(data=city_boundary, fill='#22192b', color='grey65')+
-    stat_density2d(data= data.frame(st_coordinates(opioid_data20)),
-                   aes(X,Y, fill=..level..,alpha=..level..),
-                   size=0.01, bins=40, geom='polygon')+
-    scale_fill_viridis(option = 'F',  direction = 1) +
-    scale_alpha(range=c(0.00,0.35), guide='none')+
-    geom_sf(data = opioid_data20,
-            aes(size = count),
-            color = '#fffaf2',
-            alpha = .1)+
-    guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
-    labs(subtitle = '2020',
-         fill = 'Density',
-         size = 'Count at nearest\n 1/3 mi. interval')+
-   scale_size_continuous(breaks=seq(1, 61, by=15),
-                         range = c(1,10))+ mapTheme()
-mylegend<-g_legend(p1)
-
-grid.arrange(p1 + theme(legend.position="none"),
-             p2 + theme(legend.position="none"),
-             mylegend ,nrow=1,widths=c(2,2,.75), top = "Opioid Overdose Occurances in Mesa, AZ")
-# test<-data.frame(st_coordinates(opioid_data))
 #----UNUSED DATA SETS----
 
 # city parcel shapes
@@ -1071,7 +1028,7 @@ ggplot() +
   scale_fill_viridis(option = "F", direction = -1) +
   scale_colour_viridis(option = "F", direction = -1) +
   facet_wrap(~Regression) +  
-  labs(title="Narcotics Incidents Errors", subtitle = "Random K-Fold and      Spatial Cross Validation", caption = "fig #") +
+  labs(title="Narcotics Incidents Errors", subtitle = "Random K-Fold and Spatial Cross Validation", caption = "fig #") +
   mapTheme()
 
 #---TABLE----
@@ -1115,27 +1072,29 @@ filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>%
 
 
 grid.arrange(
-reg.summary%>%filter(Regression == "Spatial LOGO-CV: Spatial Process")%>%
-  ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
-  scale_fill_viridis(option = "F", direction = -1) +
-  scale_colour_viridis(option = "F", direction = -1)+
-  labs(title='Spatial LOGO-CV: Spatial Process')+mapTheme()+theme(panel.border=element_blank()),
-reg.summary%>%filter(Regression == "Spatial LOGO-CV: Just Risk Factors")%>%
-  ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
-  scale_fill_viridis(option = "F", direction = -1) +
-  scale_colour_viridis(option = "F", direction = -1)+
-  labs(title='Spatial LOGO-CV: Just Risk Factors')+mapTheme()+theme(panel.border=element_blank()),
-ggplot() +
-  geom_sf(data = reg.summary, aes(fill = countoverdose, colour = countoverdose))+
-  scale_fill_viridis(option = "F", direction = -1) +
-  scale_colour_viridis(option = "F", direction = -1)+
-  labs(title='Observed Overdoses')+mapTheme()+theme(panel.border=element_blank()),nrow=1)
+  reg.summary%>%filter(Regression == "Spatial LOGO-CV: Just Risk Factors")%>%
+    ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
+    scale_fill_viridis(option = "F", direction = -1) +
+    scale_colour_viridis(option = "F", direction = -1)+
+    labs(title='Spatial LOGO-CV: Just Risk Factors')+mapTheme()+theme(panel.border=element_blank(),
+                                                                      legend.position = "bottom",
+                                                                      legend.key.size = unit(.5, 'cm')),
+  reg.summary%>%filter(Regression == "Spatial LOGO-CV: Spatial Process")%>%
+    ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
+    scale_fill_viridis(option = "F", direction = -1) +
+    scale_colour_viridis(option = "F", direction = -1)+
 
-# left off here trying to create a plot that compares both LOGO regression types to the observed overdose incidents 
-# i got close but the first plot is facet wrapped and the second is not, it makes it look really bad
-# the solution might be to create three separate plots instead of facet wrapping the first two
+    labs(title='Spatial LOGO-CV: Spatial Process')+mapTheme()+theme(panel.border=element_blank(),
+                                                                    legend.position = "bottom",
+                                                                    legend.key.size = unit(.5, 'cm')),
+  ggplot() +
+    geom_sf(data = reg.summary, aes(fill = countoverdose, colour = countoverdose))+
+    scale_fill_viridis(option = "F", direction = -1) +
+    scale_colour_viridis(option = "F", direction = -1)+
+    labs(title='Observed Overdoses')+mapTheme()+theme(panel.border=element_blank(),
+                                                      legend.position = "bottom",
+                                                      legend.key.size = unit(.5, 'cm')), nrow=1)
 
-#Test  generalizability across neighborhood
 
 st_drop_geometry(reg.summary) %>%
   group_by(Regression) %>%
@@ -1152,21 +1111,7 @@ st_drop_geometry(reg.summary) %>%
   plotTheme()
 
 
-#Kernel Density Plot
-opioid_ppp <- as.ppp(st_coordinates(opioid_data), W = st_bbox(final_net))
-opioid_KD <- density.ppp(opioid_ppp, 1000)
-
-as.data.frame(opioid_KD) %>%
-  st_as_sf(coords = c("x", "y"), crs = st_crs(final_net)) %>%
-  aggregate(., final_net, mean) %>%
-  ggplot() +
-  geom_sf(aes(fill=value)) +
-  geom_sf(data = sample_n(opioid_data, 1500), size = 1, color = 'blue') +
-  scale_fill_viridis(option = "F", direction = -1) +
-  labs(title = "Kernel density of opioid overdoses in 2019 ") +
-  mapTheme()
-
-
+#Test  generalizability across neighborhood
 #Get 2019 Data
 blockgroups19 <- get_acs(geography = "block group", variables = c("B01003_001","B03002_012"), 
                          year=2019, state=04, county=013, geometry=T) %>% 
@@ -1190,21 +1135,147 @@ reg.summary %>%
   kable(caption = "Table 2") %>%
   kable_material()
 
-remove.packages('cli')
-install.packages('cli')
-remove.packages('stringi')
-remove.packages('stringi')
-remove.packages('rlang')
-remove.packages('glue')
-install.packages('rlang')
+
+#-----KD PLOT-----
+
+#kernel density plot 2017-2021
+p1<- ggplot()+
+  geom_sf(data=city_boundary, fill='#22192b', color='black')+
+  stat_density2d(data= data.frame(st_coordinates(opioid_data17)),
+                 aes(X,Y, fill=..level..,alpha=..level..),
+                 size=0.01, bins=40, geom='polygon')+
+  scale_fill_viridis(option = 'F',  direction = 1) +
+  scale_alpha(range=c(0.00,0.35), guide='none')+
+  geom_sf(data = opioid_data17%>%distinct(geometry, .keep_all=TRUE),
+          aes(size = count),
+          color = '#fffaf2',
+          alpha = .5)+
+  guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
+  labs(subtitle = '2017',
+       fill = 'Density',
+       size = 'Count at nearest\n 1/3 mi. interval')+
+  scale_size_continuous(breaks=seq(1, 61, by=15),
+                        range = c(1,10))+ mapTheme()+theme(legend.key.size = unit(.75, 'cm'))
+
+p2<- ggplot()+
+  geom_sf(data=city_boundary, fill='#22192b', color='black')+
+  stat_density2d(data= data.frame(st_coordinates(opioid_data20)),
+                 aes(X,Y, fill=..level..,alpha=..level..),
+                 size=0.01, bins=40, geom='polygon')+
+  scale_fill_viridis(option = 'F',  direction = 1) +
+  scale_alpha(range=c(0.00,0.35), guide='none')+
+  geom_sf(data = opioid_data20%>%distinct(geometry, .keep_all=TRUE),
+          aes(size = count),
+          color = '#fffaf2',
+          alpha = .5)+
+  scale_size_continuous(breaks=seq(1, 61, by=15),
+                        range = c(1,10))+ 
+  guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
+  labs(subtitle = '2020',
+       fill = 'Density',
+       size = 'Count at nearest\n 1/3 mi. interval')+
+  mapTheme()
+
+p3<- ggplot()+
+  geom_sf(data=city_boundary, fill='#22192b', color='black')+
+  stat_density2d(data= data.frame(st_coordinates(opioid_data17)),
+                 aes(X,Y, fill=..level..,alpha=..level..),
+                 size=0.01, bins=40, geom='polygon')+
+  scale_fill_viridis(option = 'F',  direction = 1) +
+  scale_alpha(range=c(0.00,0.35), guide='none')+
+  labs(subtitle = 'Kernel Density 2017')+ mapTheme()
+
+p4<- ggplot()+
+  geom_sf(data=city_boundary, fill='#22192b', color='black')+
+  stat_density2d(data= data.frame(st_coordinates(opioid_data20)),
+                 aes(X,Y, fill=..level..,alpha=..level..),
+                 size=0.01, bins=40, geom='polygon')+
+  scale_fill_viridis(option = 'F',  direction = 1) +
+  scale_alpha(range=c(0.00,0.35), guide='none')+
+  labs(subtitle = 'Kernel Density 2020')+ mapTheme()
+
+mylegend<-g_legend(p1)
+
+grid.arrange(p3 + theme(legend.position="none"),
+             p4 + theme(legend.position="none"),
+             mylegend, 
+             p1 + theme(legend.position="none"),
+             p2 + theme(legend.position="none"),
+             nrow=2,ncol=3,widths=c(2,2,.5), top = "Opioid Overdose Occurances in Mesa, AZ")
+  
 
 
-devtools::install_github("dkahle/ggmap")
+# In this section, we ask whether risk predictions outperform traditional 'Kernel density' hotspot mapping. 
+# To add an element of across-time generalizability, 
+# hotspot and risk predictions from these 2017 burglaries are used to predict the location of burglaries from 2018.
 
-mesa_google<- get_googlemap("mesa, arizona", 
-                                  zoom = 12, maptype = 'terrain', color = 'color')%>%ggmap()
+#Goodness of fit indicator - illustrate whether the 2017 kernel density or risk predictions capture
+#more of the 2018 burglaries. If the risk predictions capture more observed burglaries than the kernel density,
+#then the risk prediction model provides a more robust targeting tool for allocating police resources.
+
+#Step1 - 2018 opioid data 
+opioid_data18 <- opioid_data%>%filter(year=='2018')
+
+# Step 2
+#Kernel Density for 2017 data
+opioid_ppp <- as.ppp(st_coordinates(opioid_data), W = st_bbox(final_net))
+opioid_KD <- density.ppp(opioid_ppp, 1000)
+
+opioid_KDE_sf <- as.data.frame(opioid_KD) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(final_net)) %>%
+  aggregate(., final_net, mean) %>%
+  mutate(label = "Kernel Density",
+         Risk_Category = ntile(value, 100),
+         Risk_Category = case_when(
+           Risk_Category >= 90 ~ "90% to 100%",
+           Risk_Category >= 70 & Risk_Category <= 89 ~ "70% to 89%",
+           Risk_Category >= 50 & Risk_Category <= 69 ~ "50% to 69%",
+           Risk_Category >= 30 & Risk_Category <= 49 ~ "30% to 49%",
+           Risk_Category >= 1 & Risk_Category  <= 29 ~ "1% to 29%")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(opioid_data18) %>% mutate(overdoseCount = 1), ., sum) %>%
+      mutate(overdoseCount = replace_na(overdoseCount, 0))) %>%
+  dplyr::select(label, Risk_Category, overdoseCount)
+
+# Step 3
+opioid_risk_sf <-
+  filter(reg.summary, Regression == "Spatial LOGO-CV: Spatial Process") %>%
+  mutate(label = "Risk Predictions",
+         Risk_Category = ntile(Prediction, 100),
+         Risk_Category = case_when(
+           Risk_Category >= 90 ~ "90% to 100%",
+           Risk_Category >= 70 & Risk_Category <= 89 ~ "70% to 89%",
+           Risk_Category >= 50 & Risk_Category <= 69 ~ "50% to 69%",
+           Risk_Category >= 30 & Risk_Category <= 49 ~ "30% to 49%",
+           Risk_Category >= 1 & Risk_Category <= 29 ~ "1% to 29%")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(opioid_data18) %>% mutate(overdoseCount = 1), ., sum) %>%
+      mutate(overdoseCount = replace_na(overdoseCount, 0))) %>%
+  dplyr::select(label, Risk_Category, overdoseCount)
+
+# Step 4
+rbind(opioid_KDE_sf , opioid_risk_sf) %>%
+  na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category, -geometry) %>%
+  ggplot() +
+  geom_sf(aes(fill = Risk_Category), colour = NA) +
+  geom_sf(data = opioid_data18%>%distinct(geometry, .keep_all=TRUE),
+          aes(size = count),
+          color = 'black',
+          alpha = .35)+
+  scale_size_continuous(breaks=seq(1, 75, by=15),
+                        range = c(1,15))+
+  guides(size= guide_legend(title = "2018 Overdoses",
+                            override.aes = list(size = c(3,6,9,12,15))))+
+  facet_wrap(~label, ) +
+  scale_fill_viridis(option = "F", direction = -1, discrete = TRUE, alpha = .75) +
+  labs(title="Comparison of Kernel Density and Risk Predictions",
+       subtitle="2017 Overdose Risk Predictions; 2018 Overdose", caption = "fig 8") +
+  mapTheme()
 
 
-geom_point(data = )
-print(mesa_google)
+
+
 
