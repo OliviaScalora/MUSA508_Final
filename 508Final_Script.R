@@ -4,7 +4,9 @@ install.packages('ggmap')
 # install.packages("data.table")
 # install.packages("RgoogleMaps")
 # install.packages("ggmap")
- # install.packages('rstudioapi')
+# install.packages('rstudioapi')
+# install.packages('ggpubr')
+
 # #load libraries
 library(tidyverse)
 library(sf)
@@ -31,6 +33,7 @@ library(geojsonio)
 library(data.table)
 library(RgoogleMaps)
 library(rstudioapi)
+library(ggpubr)
 
 options(scipen=999)
 options(tigris_class = "sf")
@@ -182,6 +185,12 @@ mesa_tracts17 <- tracts17[city_boundary,]%>%
 
 #census block groups
  
+blockgroups17 <- get_acs(geography = "block group", variables = c("B01003_001","B19013_001","B25058_001",
+                                                                  "B25003_003", "B25003_002", "B25004_001", "B25001_001",
+                                                                  "B02001_002", "B03002_012"), 
+                         year=2017, state=04, county=013, geometry=T) %>% 
+  st_transform('EPSG:2224')
+
 
 mesa_bg17 <- blockgroups17[city_boundary,]%>%
   dplyr::select( -NAME, -moe) %>%
@@ -195,7 +204,6 @@ mesa_bg17 <- blockgroups17[city_boundary,]%>%
          VacantUnits = B25004_001,
          TotalUnits = B25001_001,
          TotalWhite = B02001_002,
-         BelPov100 = B06012_002,
          HispTotal = B03002_012)%>% 
   mutate(area = st_area(geometry),
          Pct.Vacant = VacantUnits/TotalUnits,
@@ -208,8 +216,6 @@ mesa_bg17 <- blockgroups17[city_boundary,]%>%
   filter(GEOID != '040139413004')%>%
   filter(GEOID != '040139413003')%>%
   filter(GEOID != '040133184002')
-
-# Mesa <- get_map("mesa, arizona", maptype = "toner-2010")
 
 #----CENSUS VARIABLES----
 
@@ -230,12 +236,9 @@ hisp_bg <- mesa_bg17%>%filter(Pct.Hisp >= .5)%>%dplyr::select(GEOID,geometry,)%>
 #block groups where vast majority white
 white_bg <- mesa_bg17%>%filter(Pct.White >= .85)%>%dplyr::select(GEOID,geometry,)%>%mutate(Legend = 'Majority White')
 
-
-
-ggplot()+
-  geom_sf(data=city_boundary, fill= NA, color = 'black')+
-   geom_sf(data =low_inc_BG, fill = 'lightblue', color = 'black', alpha = .5)+mapTheme()
-
+# ggplot()+
+#   geom_sf(data=city_boundary, fill= NA, color = 'black')+
+#    geom_sf(data =low_inc_BG, fill = 'lightblue', color = 'black', alpha = .5)+mapTheme()
 
 #----OPIOID DATA----
 opioid_data <- st_as_sf(na.omit(read.socrata("https://data.mesaaz.gov/resource/qufy-tzv6.json")), 
@@ -256,67 +259,105 @@ opioid_data <- opioid_data[city_boundary,]
 opioid_data17 <- opioid_data%>%filter(year=='2017')
 opioid_data20 <- opioid_data%>%filter(year=='2020')
 
-#plot opioid overdoses 
+#----PLAYING AROUND WITH PLOTS-----
+
+g_legend<-function(a.gplot){
+  tmp <- ggplot_gtable(ggplot_build(a.gplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)
+  }
+
+
+#plot opioid overdoses 2017-2020
+grid.arrange(
 ggplot()+
   geom_sf(data = mesa_tracts17,
-          aes(fill = q5(TotalPop)),
+          fill = NA,
           color = "black")+
   scale_fill_brewer(palette=1)+
-  geom_sf(data = opioid_data,
+  geom_sf(data = opioid_data17,
           aes(size = count),
           color = 'red',
-          alpha = .5)+
-  scale_size_continuous(breaks=seq(1, 4, by=1),
-                        range = c(1,10))+
+          alpha = .25)+
+  scale_size_continuous(breaks=seq(1, 61, by=15),
+                         range = c(1,20))+
   guides(color= guide_legend(), 
-         size= guide_legend(title = 'Overdose Incidents'),
+          size= guide_legend(title = 'count',
+                             override.aes = list(size = c(1,3,5,7,11))),
          fill = guide_legend(title = 'Total Living Below Poverty'))+ 
-  labs(title= 'Mesa, AZ Opioid Overdoses 2017-2021')+
+  labs(subtitle = "2017")+
   geom_sf(data=city_boundary,
           color = 'black',
           size = 1,
-          fill = NA)+mapTheme()
+          fill = NA)+mapTheme(),
+ggplot()+
+  geom_sf(data = mesa_tracts17,
+          fill = NA,
+          color = "black")+
+  scale_fill_brewer(palette=1)+
+  geom_sf(data = opioid_data20,
+          aes(size = count),
+          color = 'red',
+          alpha = .25)+
+  scale_size_continuous(breaks=seq(1, 61, by=15),
+                        range = c(1,20))+
+  guides(color= guide_legend(), 
+          size= guide_legend(title = 'count',
+                             override.aes = list(size = c(1,3,5,7,11))),
+         )+ 
+  labs(subtitle = "2020")+
+  geom_sf(data=city_boundary,
+          color = 'black',
+          size = 1,
+          fill = NA)+mapTheme(), nrow=1)
 
 # point_list<- opioid_data%>%dplyr::select(count, geometry)%>%
 #               mutate(point = as.character(geometry))
 
 
 #kernel density plot 2017-2021
-grid.arrange(
-ggplot()+
-  geom_sf(data=city_boundary, fill='#22192b', color='grey65')+
-   stat_density2d(data= data.frame(st_coordinates(opioid_data)),
-                  aes(X,Y, fill=..level..,alpha=..level..),
-                  size=0.01, bins=40, geom='polygon')+
-  scale_fill_viridis(option = 'F', direction = 1) +
-  scale_alpha(range=c(0.00,0.35), guide='none')+
-  # geom_sf(data = opioid_data,
-  #         aes(size = count),
-  #         color = '#fffaf2',
-  #         alpha = .05)+
-  labs(title = 'Kernel Density 2017-2021',
-       fill = 'Density',
-       size = 'Count at nearest\n 1/3 mi. interval')+
-  scale_size_continuous(breaks=seq(1, 4, by=1),
-                        range = c(1,10))+ mapTheme(),
-ggplot()+
-  geom_sf(data=city_boundary, fill='#22192b', color='grey65')+
-  stat_density2d(data= data.frame(st_coordinates(opioid_data17)),
-                 aes(X,Y, fill=..level..,alpha=..level..),
-                 size=0.01, bins=40, geom='polygon')+
-  scale_fill_viridis(option = 'F',  direction = 1) +
-  scale_alpha(range=c(0.00,0.35), guide='none')+
-  geom_sf(data = opioid_data17,
-          aes(size = count),
-          color = '#fffaf2',
-          alpha = .1)+
-  guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
-  labs(title = 'Kernel Density and Graduated Point 2017',
-       fill = 'Density',
-       size = 'Count at nearest\n 1/3 mi. interval')+
-  scale_size_continuous(breaks=seq(1, 4, by=1),
-                        range = c(1,10))+ mapTheme(), nrow=1, top = "Opioid Overdose Occurances in Mesa, AZ")
 
+ p1<- ggplot()+
+    geom_sf(data=city_boundary, fill='#22192b', color='grey65')+
+    stat_density2d(data= data.frame(st_coordinates(opioid_data17)),
+                   aes(X,Y, fill=..level..,alpha=..level..),
+                   size=0.01, bins=40, geom='polygon')+
+    scale_fill_viridis(option = 'F',  direction = 1) +
+    scale_alpha(range=c(0.00,0.35), guide='none')+
+    geom_sf(data = opioid_data17,
+            aes(size = count),
+            color = '#fffaf2',
+            alpha = .1)+
+    guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
+    labs(subtitle = '2017',
+         fill = 'Density',
+         size = 'Count at nearest\n 1/3 mi. interval')+
+   scale_size_continuous(breaks=seq(1, 61, by=15),
+                         range = c(1,10))+ mapTheme()+theme(legend.key.size = unit(.75, 'cm'))
+ 
+ p2<- ggplot()+
+    geom_sf(data=city_boundary, fill='#22192b', color='grey65')+
+    stat_density2d(data= data.frame(st_coordinates(opioid_data20)),
+                   aes(X,Y, fill=..level..,alpha=..level..),
+                   size=0.01, bins=40, geom='polygon')+
+    scale_fill_viridis(option = 'F',  direction = 1) +
+    scale_alpha(range=c(0.00,0.35), guide='none')+
+    geom_sf(data = opioid_data20,
+            aes(size = count),
+            color = '#fffaf2',
+            alpha = .1)+
+    guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
+    labs(subtitle = '2020',
+         fill = 'Density',
+         size = 'Count at nearest\n 1/3 mi. interval')+
+   scale_size_continuous(breaks=seq(1, 61, by=15),
+                         range = c(1,10))+ mapTheme()
+mylegend<-g_legend(p1)
+
+grid.arrange(p1 + theme(legend.position="none"),
+             p2 + theme(legend.position="none"),
+             mylegend ,nrow=1,widths=c(2,2,.75), top = "Opioid Overdose Occurances in Mesa, AZ")
 # test<-data.frame(st_coordinates(opioid_data))
 #----UNUSED DATA SETS----
 
@@ -445,7 +486,7 @@ Industrial <- st_read("https://raw.githubusercontent.com/OliviaScalora/MUSA508_F
 
 
 zoning<- rbind(Commercial, HD_Residential, LD_Residential, Downtown, Industrial)
-zoning$zone <- factor(zoning$zone, levels = c('HD','LD','com','DT','ind'))
+zoning$zone <- factor(zoning$zone, levels = c('HD','LD','DT','com','ind'))
 
 #ZonePlot1
 # ggplot()+
@@ -484,7 +525,7 @@ zoning$zone <- factor(zoning$zone, levels = c('HD','LD','com','DT','ind'))
 #   labs(size = 'Count at nearest\n 1/3 mi. interval')+
 #   mapTheme()
 
-#ZonePlot1 - for powerpoint
+#ZonePlot1
 ggplot()+
   geom_sf(data=city_boundary,
           color = 'black',
@@ -496,14 +537,14 @@ ggplot()+
   geom_sf(data = opioid_data17,
           aes(size = count),
           color = '#e5383b', alpha = .5)+
-  scale_fill_manual(values = c("#fe938c", "#9cafb7", "#b3917d", "#4281a4","#ead2ac"),
-                    labels=c('High Density Res','Low Density Res','Commercial','Downtown','Industrial')) +
+  scale_fill_manual(values = c("#4281a4","#9cafb7", "#db534b", "#fe938c", "#ead2ac"),
+                    labels=c('High Density Res','Low Density Res','Downtown','Commercial','Industrial')) +
   scale_size_continuous(breaks=seq(1, 4, by=1),
-                        range = c(1,10))+
+                        range = c(1,20))+
   guides(size = guide_legend(override.aes = list(size = c(1,4,8,10))))+
   labs(size = 'Count at nearest\n 1/3 mi. interval', fill = 'Zone Type',
        title = 'Zoning and Opioid Overdoses',
-       subtitle= 'Mesa, Az; 2017-2021')+
+       subtitle= 'Mesa, Az; 2017')+
   mapTheme()+theme(panel.background = element_rect(fill = "#f0efeb"),
                    legend.background = element_rect(fill="#f0efeb"),
                    plot.background = element_rect(fill = '#f0efeb'),
@@ -525,20 +566,20 @@ fishnet <-
 
 #join overdoses to the fishnet
 opioid_net <- 
-  dplyr::select(opioid_data) %>% 
-  mutate(countoverdose = 1) %>% 
-  aggregate(., fishnet, sum) %>%
-  mutate(countoverdose = replace_na(countoverdose, 0),
-         uniqueID = rownames(.),
-         cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
-
-opioid_net17 <- 
   dplyr::select(opioid_data17) %>% 
   mutate(countoverdose = 1) %>% 
   aggregate(., fishnet, sum) %>%
   mutate(countoverdose = replace_na(countoverdose, 0),
          uniqueID = rownames(.),
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
+# 
+# opioid_net17 <- 
+#   dplyr::select(opioid_data17) %>% 
+#   mutate(countoverdose = 1) %>% 
+#   aggregate(., fishnet, sum) %>%
+#   mutate(countoverdose = replace_na(countoverdose, 0),
+#          uniqueID = rownames(.),
+#          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
 
 #opioid fishnet plot
 ggplot() +
@@ -549,14 +590,14 @@ ggplot() +
        caption = "Lighter pixels represent areas of higher observed opioid overdose incidents.") +
   mapTheme()
 
-#opioid fishnet plot
-ggplot() +
-  geom_sf(data = opioid_net17, aes(fill = countoverdose), color= NA)+
-  scale_fill_viridis(option = 'F', direction = -1) +
-  labs(title = "Count of Overdoses for the fishnet",
-       subtitle = "Mesa, AZ; 2017",
-       caption = "Lighter pixels represent areas of higher observed opioid overdose incidents.") +
-  mapTheme()
+# #opioid fishnet plot
+# ggplot() +
+#   geom_sf(data = opioid_net17, aes(fill = countoverdose), color= NA)+
+#   scale_fill_viridis(option = 'F', direction = -1) +
+#   labs(title = "Count of Overdoses for the fishnet",
+#        subtitle = "Mesa, AZ; 2017",
+#        caption = "Lighter pixels represent areas of higher observed opioid overdose incidents.") +
+#   mapTheme()
 
 
 
@@ -821,39 +862,38 @@ final_net <-
 
 final_net <-
   st_centroid(final_net) %>%
-  st_join(dplyr::select(mesa_tracts17, GEOID), by = "uniqueID") %>%
+  st_join(dplyr::select(mesa_bg17, GEOID), by = "uniqueID") %>%
   st_drop_geometry() %>%
   left_join(dplyr::select(final_net, geometry, uniqueID)) %>%
   st_sf() %>%
   na.omit()
 
-final_net17 <-
-  left_join(opioid_net17, st_drop_geometry(vars_net), by="uniqueID") 
-
-final_net17 <-
-  st_centroid(final_net17) %>%
-  st_join(dplyr::select(mesa_tracts17, GEOID), by = "uniqueID") %>%
-  st_drop_geometry() %>%
-  left_join(dplyr::select(final_net17, geometry, uniqueID)) %>%
-  st_sf() %>%
-  na.omit()
+# final_net17 <-
+#   left_join(opioid_net17, st_drop_geometry(vars_net), by="uniqueID") 
+# 
+# final_net17 <-
+#   st_centroid(final_net17) %>%
+#   st_join(dplyr::select(mesa_tracts17, GEOID), by = "uniqueID") %>%
+#   st_drop_geometry() %>%
+#   left_join(dplyr::select(final_net17, geometry, uniqueID)) %>%
+#   st_sf() %>%
+#   na.omit()
 
 #----LOCAL MORAN'S I----
 
 ## generates warnings from PROJ issues
 ## {spdep} to make polygon to neighborhoods... 
 final_net.nb <- poly2nb(as_Spatial(final_net), queen=TRUE)
-final_net.nb17 <- poly2nb(as_Spatial(final_net17), queen=TRUE)
-## ... and neighborhoods to list of weigths
+## .. and neighborhoods to list of weigths
 final_net.weights <- nb2listw(final_net.nb, style="W", zero.policy=TRUE)
-
 #print(final_net.weights, zero.policy=TRUE)
-
 ## see ?localmoran
 local_morans <- localmoran(final_net$countoverdose, final_net.weights, zero.policy=TRUE) %>% 
   as.data.frame()
 
+
 # join local Moran's I results to fishnet
+
 final_net.localMorans <- 
   cbind(local_morans, as.data.frame(final_net)) %>% 
   st_sf() %>%
@@ -863,10 +903,8 @@ final_net.localMorans <-
   mutate(Significant_Hotspots = ifelse(P_Value <= 0.001, 1, 0)) %>%
   gather(Variable, Value, -geometry)
 
-
 vars <- unique(final_net.localMorans$Variable)
 varList <- list()
-
 
 for(i in vars){
   varList[[i]] <- 
@@ -877,7 +915,6 @@ for(i in vars){
     labs(title=i) +
     mapTheme() + theme(legend.position="bottom")}
 
-
 do.call(grid.arrange,c(varList, ncol = 4, top = "Local Morans I statistics, Mesa, AZ Overdose Incidents", bottom = "fig 4"))
 
 final_net <- final_net %>% 
@@ -887,9 +924,6 @@ final_net <- final_net %>%
            nn_function(st_coordinates(st_centroid(final_net)),
                        st_coordinates(st_centroid(filter(final_net, 
                                            overdose.isSig == 1))),k = 1))
-final_net.long <- 
-  gather(final_net, Variable, value, -geometry, -uniqueID)
-
 
 #Plot distance to nearest significant hotspot
 ggplot() +
@@ -900,19 +934,6 @@ ggplot() +
            title= 'Distance to Significant Overdose Hotspot',
            subtitle = 'Mesa, AZ') +
       mapTheme()
-
-colourCount = length(unique(final_net$GEOID))
-getPalette = colorRampPalette(brewer.pal(12, "Paired"))
-
-#Plot census blockgroups joined to fishnet
-ggplot() +
-  geom_sf(data = final_net, 
-          aes(fill=GEOID), colour='grey75', size =.25) +
-  scale_fill_manual(values = getPalette(colourCount))+
-  labs(title= 'Block Groups ',
-       subtitle = 'Mesa, AZ') +
-  mapTheme()+theme(legend.position = 'none')
-
 
 #----CORRELATION PLOTS----
 
@@ -965,13 +986,13 @@ colnames(final_net)
 
 #Just Risk Factors
 reg.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Industrial", "Downtown", 
-                 "Park.nn", "Child.Crisis.Center.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing.nn", "High.Vacancy", "Low.Income", "Low.Rent",
+                 "Park.nn", "Child.Crisis.Center", "Arts.and.Education.nn", "Police.Fire.Station", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
                  "Majority.White", "Majority.Hispanic")
 
 #Include Local Moran's I Statistic
-reg.ss.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Industrial", "overdose.isSig", "overdose.isSig.dist", "Downtown", 
-                 "Park.nn", "Child.Crisis.Center.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing.nn", "High.Vacancy", "Low.Income", "Low.Rent",
-                 "Majority.White", "Majority.Hispanic")
+reg.ss.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Industrial", "Downtown", 
+                 "Park.nn", "Child.Crisis.Center", "Arts.and.Education.nn", "Police.Fire.Station", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
+                 "Majority.White", "Majority.Hispanic", "overdose.isSig.dist", "overdose.isSig")
 
 ## RUN REGRESSIONS
 
@@ -1025,7 +1046,7 @@ reg.summary <-
            Regression = "Spatial LOGO-CV: Spatial Process")) %>%
   st_sf() 
 
-# calculate errors by NEIGHBORHOOD
+# calculate errors by Block Group
 error_by_reg_and_fold <- 
   reg.summary  %>%
   group_by(Regression, cvID) %>% 
