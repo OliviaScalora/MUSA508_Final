@@ -7,39 +7,6 @@ The City of Mesa has a dataset of heroin overdose locations. Using these data ex
 You can also undertake this project using [similar data from Cincinnati, Ohio.](https://github.com/sydng/Cincinatti_Overdose_Data)
 
 Think critically about how you might offer these predictions to a public health official in your app. What do they want to know? Also remember that while your predictions are about overdose, it may be safe to assume that these are also places where people are just using heroin. 
-
-<br></br>
-## Project Timeline 
-
-
-### 11/26 Weekend Zoom meeting   
-
-
-### 11/29 Meet midday 
-
-
-### 12/3 
-##### Preliminary research 
-*   Examples of prediction apps  
-*   Existing programs in Mesa 
-##### App Concept Development   
-*   Answer use case questions  
-*   Wireframes 
-
-
-### 12/10 
-##### Olivia -Exploratory Data Analysis 
-*   Wrangle & manipulate data  
-*   Build model  
-##### Hasa- Presentation Prep   
-*   Create slides 
-*   Tell concise story of our concept 
-
-
-### 12/17 
-##### Olivia - Create Markdown 
-##### Hasa - Record Video 
-
 <br></br>
 ## Use Case Questions 
 
