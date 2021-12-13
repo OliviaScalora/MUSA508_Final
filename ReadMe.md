@@ -21,7 +21,7 @@ OOTC will serve two purposes
 * Be a safe space that provides support, safe - monitoring/safe injection site, overdose treatment, and primary care for individuals who are using and would otherwise be on the street.   
 * Have staff and resources prepared for emergency response to overdose incidents -- cater to public and residential overdoses.   
     
-  Create a user-friendly web application accessible to healthcare officials that visualizes the urgency for these new centers and describes the best locations for potential Opioid Observation and Treatment Centers (OOTC). City and healthcare officials can properly allocate staff and resources to creating these centers with the goal of mitigating opioid overdose death. 
+  Conceptualize a user-friendly web application accessible to healthcare officials that visualizes the urgency for these new centers and describes the best locations for potential Opioid Observation and Treatment Centers (OOTC). City and healthcare officials can properly allocate staff and resources to creating these centers with the goal of mitigating opioid overdose death. 
     
 #### <li> How could data make a difference in answering this question? Do you have a sense for the business as usual decision making? </li>
 
@@ -55,11 +55,11 @@ Gaps in treatment facility access – there are still people not elligible for A
  
 #### <li>What kind of model would you build and what is the dependent variable? </li>
 
-We will use a geospatial risk model to predict heroin overdoses as a function of environmental factors (see data above) 
+Geospatial risk model- Poisson Regression- to predict heroin overdoses as a function of environmental factors (see data above) 
 
 #### <li>How will you validate this model (cross-validation & goodness of fit metrics that relate to the business process)? </li>
 
-The model will be validated against a kernal density. Train the model for the year of 2018 and test on the year 2019. The city saw a huge spike in overdoses between 2019 and 2020 so it would not make sense to train and test between these years, however the 2020 spike is something to take into account for forecasting. TBD...
+Kfold and Leave One Group Out(LOGO) Cross Validation - test with and without variable to account for spatial process.
     
 #### <li>How do you think that stakeholders would want to consume this data? </li>
 
