@@ -112,21 +112,30 @@ g_legend<-function(a.gplot){
 
 ```
 
-
 # INTRODUCTION
 
-a. Motivate the analysis – “What is the use case; why would someone want to replicate your analysis and why would they use this approach?”
-	b. Describe the data you used.
-	c. Describe your exploratory analysis using maps and plots.
-	d. What is the spatial or space/time process?
-d. Describe your modeling approach and show how you arrived at your final model.
-e. Validate your model with cross-validation and describe how your predictions are useful (accuracy vs. generalizability).
-f. Provide additional maps and data visualizations to show that your model is useful.
-g. Talk about how your analysis meets the use case you set out to address.
-h. What could you do to make the analysis better?
+The opioid crisis in Mesa, Arizona is a public health emergency that must be addressed. A spike in overdoses onset by the COVID-19 pandemic in early 2020 saw an increase of 76% in the number of opioid overdose incidents and a 132% increase in opioid related deaths^1^. The problem is not a new one, however. Due to an alarming increase in opioid deaths in 2016, Governor Ducey declared a state of emergency on June 5, 2017. The Mesa County Opioid Response Group was established in June 2018 to reduce the community impact of opioids through prevention, treatment, and recovery services. 
+The goal of the group is to prevent substance misuse through:   
 
+*   Education of community members & health providers  
+*   Improving treatment access & retention  
+*   Reduce harm by providing educational information and training on Naloxone and how to obtain and use the life-saving overdose reversal drug.     
+  
+The state of emergency was officially terminated in May, 2018, despite the growing numbers. Figure 1, sourced from the [*data.mesaaz.gov*](https://data.mesaaz.gov/stories/s/Opioid-Overdose-A-Public-Health-Emergency/ma3e-anqw/), illustrates the urgency of the increasing overdose count. 
 
-# DATA 
+<div class="plot">
+<script type="text/javascript" charset="UTF-8" data-locale="en" data-socrata-domain="data.mesaaz.gov" src="https://data.mesaaz.gov/component/visualization/v1/socrata-visualizations-loader.js"></script>
+<a class="socrata-visualization-embed" data-embed-version="1" data-height="600" data-socrata-domain="data.mesaaz.gov" data-vizcan-uid="b2ur-kyru" data-vif="{&quot;configuration&quot;:{&quot;viewSourceDataLink&quot;:true,&quot;treatNullValuesAsZero&quot;:true,&quot;showDimensionLabels&quot;:true,&quot;dimensionLabelRotationAngle&quot;:0,&quot;xAxisScalingMode&quot;:&quot;pan&quot;,&quot;axisLabels&quot;:{&quot;left&quot;:&quot;# of incidents&quot;},&quot;showValueLabels&quot;:true,&quot;showLegendOpened&quot;:true},&quot;series&quot;:[{&quot;unit&quot;:{&quot;other&quot;:&quot;Overdose Incidents&quot;,&quot;one&quot;:&quot;Overdose Incident&quot;},&quot;color&quot;:{&quot;secondary&quot;:&quot;#71abd9&quot;,&quot;highlight&quot;:&quot;#cccccc&quot;,&quot;palette&quot;:&quot;categorical2&quot;,&quot;customPalette&quot;:{&quot;year&quot;:{&quot;2017&quot;:{&quot;color&quot;:&quot;#a6cee3&quot;,&quot;index&quot;:0,&quot;label&quot;:&quot;2017&quot;},&quot;2018&quot;:{&quot;color&quot;:&quot;#5b9ec9&quot;,&quot;index&quot;:1,&quot;label&quot;:&quot;2018&quot;},&quot;2019&quot;:{&quot;color&quot;:&quot;#2d82af&quot;,&quot;index&quot;:2,&quot;label&quot;:&quot;2019&quot;},&quot;2020&quot;:{&quot;color&quot;:&quot;#31a75a&quot;,&quot;index&quot;:3,&quot;label&quot;:&quot;2020&quot;}}},&quot;primary&quot;:&quot;#71abd9&quot;},&quot;showLegend&quot;:true,&quot;type&quot;:&quot;columnChart&quot;,&quot;dataSource&quot;:{&quot;measure&quot;:{&quot;aggregationFunction&quot;:&quot;count&quot;},&quot;orderBy&quot;:{&quot;parameter&quot;:&quot;dimension&quot;,&quot;sort&quot;:&quot;asc&quot;},&quot;filters&quot;:[{&quot;function&quot;:&quot;noop&quot;,&quot;isHidden&quot;:false,&quot;columnName&quot;:&quot;incident_disposition&quot;,&quot;arguments&quot;:null},{&quot;function&quot;:&quot;noop&quot;,&quot;isHidden&quot;:false,&quot;columnName&quot;:&quot;gender&quot;,&quot;arguments&quot;:null},{&quot;function&quot;:&quot;noop&quot;,&quot;isHidden&quot;:false,&quot;columnName&quot;:&quot;patient_age&quot;,&quot;arguments&quot;:null},{&quot;function&quot;:&quot;noop&quot;,&quot;isHidden&quot;:false,&quot;columnName&quot;:&quot;time_of_day&quot;,&quot;arguments&quot;:null}],&quot;type&quot;:&quot;socrata.soql&quot;,&quot;datasetUid&quot;:&quot;m77w-3jfe&quot;,&quot;dimension&quot;:{&quot;grouping&quot;:{&quot;columnName&quot;:&quot;year&quot;},&quot;columnName&quot;:&quot;month&quot;,&quot;aggregationFunction&quot;:null}},&quot;label&quot;:null}],&quot;format&quot;:{&quot;type&quot;:&quot;visualization_interchange_format&quot;,&quot;version&quot;:3},&quot;description&quot;:&quot;Verified opioid incidents responded to by Mesa Fire &amp; Medical.&quot;,&quot;id&quot;:&quot;a2d94927-e70f-4368-9135-ad2a5f5bdd53&quot;,&quot;title&quot;:&quot;Opioid Overdose Incidents by Month, Year&quot;}" data-width="800" href="https://data.mesaaz.gov/Fire-and-Medical/Fire-and-Medical-Opioid-Overdose-Incidents/qufy-tzv6?referrer=embed" rel="external" target="_blank">View the data</a>
+figure 1.
+*interactive chart via* [*data.mesaaz.gov*](https://data.mesaaz.gov/stories/s/Opioid-Overdose-A-Public-Health-Emergency/ma3e-anqw/)
+</div>
+<br>
+
+We believe in the power of predictive modeling to assist in the critical decision making process around the allocation of resources towards the opioid crisis. The goal of this analysis is to estimate a geospatial risk prediction model, predicting overdoses as a function of environmental factors like crime, proximity to city facilities & services, and demographic indicators. The process includes wrangling data from [Mesa's Open Data portal](https://data.mesaaz.gov/), and engineering them into powerful predictive features. A Poisson Regression is used and cross validated with the K-Fold Leave One Group Out (LOGO) cross validation methods. We are borrowing the experience of observed opioid overdose incidents of 2017, and will test our predictions with observed opioid overdose incidents from 2018. Predictions from this models are interpreted as ‘the forecasted risk/opportunity of that event occurring here'. A series of 'goodness of fit' indicators will tell us how well our model is performing, and if it is appropriate to apply this model to future predictions.
+
+**Our end goal with the geospatisl risk model is to produce a tool that can be used by Mesa health officials to implement harm reduction strategies through proactive resource allocation.**
+<br> 
+
 
 ```{r wrangle.data, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
@@ -382,8 +391,7 @@ zoning$zone <- factor(zoning$zone, levels = c('HD','LD','DT','com','ind'))
 
 ```
 
-<div class="plot">
-```{r zone.point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE,fig.width = 8.5, fig.height = 6.7}
+```{r zone.point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE,fig.width = 9.75, fig.height = 8.03, out.width= "100%"}
 
 #ZonePlot1
 ggplot()+
@@ -392,31 +400,33 @@ ggplot()+
           color = NA,)+
   geom_sf(data = opioid_data17%>%distinct(geometry, .keep_all = TRUE),
           aes(size = count),
-          color = '#e5383b', alpha = .5)+
-  scale_fill_manual(values = c("#4281a4","#9cafb7", "#f26847", "#f6ad85", "#faebdd"),
+          color = '#f26847', alpha = .8)+
+  scale_fill_manual(values = c("#4281a4","#9cafb7", "#f26847", "#f6ad85", "#c3c1b8"),
                     labels=c('High Density Res','Low Density Res','Downtown','Commercial','Industrial')) +
   scale_size_continuous(breaks=seq(1, 4, by=1),
-                        range = c(1,20))+
-  geom_sf(data=city_boundary,color = 'black',size = 1,fill = NA)+
-  guides(size = guide_legend(override.aes = list(size = c(1,4,8,10))))+
+                        range = c(1,9))+
+  geom_sf(data=city_boundary,color = '#473126',size = .5,fill = NA)+
+  guides(size = guide_legend(override.aes = list(size = c(1,3,6,9))))+
   labs(size = 'Count at nearest\n 1/3 mi. interval', fill = 'Zone Type',
-       caption = 'fig.',
-       title = 'Zoning and Opioid Overdoses',
-       subtitle= 'Mesa, Az; 2017')+
-  mapTheme()+theme(panel.background = element_rect(fill = "transparent", color = "transparent"),
-                   legend.background = element_rect(fill="transparent", color = "transparent"),
-                   plot.background = element_rect(fill = "transparent", color = "transparent"),
-                   legend.text = element_text(color='#233d4d'),
-                   legend.title = element_text(color = '#233d4d'),
-                   plot.title = element_text(color = '#233d4d', size = 22),
+       caption = 'figure 2.',
+       title = '2017 Opioid Overdoses',
+       subtitle= 'Total: 246')+
+  mapTheme()+theme(panel.background = element_rect(fill = "#f0efeb", color = "#f0efeb"),
+                   legend.background = element_rect(fill="#f0efeb", color = "#f0efeb"),
+                   plot.background = element_rect(fill = "#f0efeb", color = "#f0efeb"),
+                   legend.text = element_text(color='#2b2005'),
+                   legend.title = element_text(color = '#2b2005'),
+                   plot.title = element_text(color = '#2b2005', size = 22),
                    panel.grid = element_blank())
 
 ```
-</div>
-<br>
 
 
-### EXPLORATORY ANALYSIS
+# EXPLORATORY ANALYSIS 
+
+### WRANGLING DATA
+
+### 
 
 ```{r fishnet, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
@@ -448,7 +458,7 @@ ggplot() +
   scale_fill_viridis(option = 'F', direction = -1) +
   labs(title = "Count of Overdoses for the fishnet",
        subtitle = "Mesa, AZ",
-       caption = "fig.") +
+       caption = "figure 3.") +
   mapTheme()
 ```
 </div>
@@ -513,7 +523,7 @@ for(i in zone_vars){
 <div class="plot">
 ```{r zone.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
 
-do.call(grid.arrange,c(zone_mapList, ncol=2, top="Density of Zone Type by Fishnet"))
+do.call(grid.arrange,c(zone_mapList, ncol=2, top="Density of Zone Type by Fishnet", bottom= "figure 4.1"))
 
 ```
 </div>
@@ -553,7 +563,7 @@ for(i in crime_vars){
 <div class="plot">
 ```{r crime.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 5}
 
-do.call(grid.arrange,c(crime_mapList, ncol=2, top="Risk Factor by Fishnet"))
+do.call(grid.arrange,c(crime_mapList, ncol=2, top="CrimeRisk Factor by Fishnet", bottom= "figure 4.2"))
 
 ```
 </div>
@@ -596,7 +606,7 @@ for(i in point_vars){
 <div class="plot">
 ```{r point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 15}
 
-do.call(grid.arrange,c(point_mapList, ncol=2, top="Risk Factor by Fishnet"))
+do.call(grid.arrange,c(point_mapList, ncol=2, top="Risk Factor by Fishnet", bottom= "figure 4.3"))
 
 ```
 </div>
@@ -644,7 +654,7 @@ for(i in point_vars.nn){
 
 <div class="plot">
 ```{r point.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 15}
-do.call(grid.arrange,c(point_mapList.nn, ncol=2, top="Nearest Neighbor Risk Factors by Fishnet"))
+do.call(grid.arrange,c(point_mapList.nn, ncol=2, top="Nearest Neighbor Risk Factors by Fishnet", bottom= "figure 4.4"))
 ```
 </div>
 <br>
@@ -688,7 +698,7 @@ for(i in census_vars){
 <div class="plot">
 ```{r census.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
 
-do.call(grid.arrange,c(census_mapList, ncol=2, top="Risk Factor by Fishnet"))
+do.call(grid.arrange,c(census_mapList, ncol=2, top="Census Variable by Fishnet", bottom= "figure 4.5"))
 
 ```
 </div>
@@ -731,7 +741,7 @@ for(i in census_vars.nn){
 
 <div class="plot">
 ```{r census.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
-do.call(grid.arrange,c(census_mapList.nn, ncol=2, top="Risk Factor by Fishnet"))
+do.call(grid.arrange,c(census_mapList.nn, ncol=2, top="Census Variable Nearest Neighbor by Fishnet", bottom= "figure 4.6"))
 ```
 </div>
 <br>
@@ -815,9 +825,9 @@ final_net.long <-
 ```
 
 <div class="plot">
-```{r local.moran.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE,fig.width =10, fig.height =10}
+```{r local.moran.plot, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10, fig.height =10}
 
-do.call(grid.arrange,c(varList, ncol = 2, top = "Local Morans I statistics, Mesa, AZ Overdose Incidents", bottom = "fig 4"))
+do.call(grid.arrange,c(varList, ncol = 2, top = "Local Morans I statistics, Mesa, AZ Overdose Incidents", bottom = "figure 5.1"))
 
 ggplot() +
       geom_sf(data = filter(final_net.long, Variable == "overdose.isSig.dist"), 
@@ -825,7 +835,8 @@ ggplot() +
       scale_fill_viridis(option = 'F', direction = -1) +
       labs(fill = 'Distance (ft)',
            title= 'Distance to Significant Overdose Hotspot',
-           subtitle = 'Mesa, AZ') +
+           subtitle = 'Mesa, AZ',
+           caption = 'figure 5.2') +
       mapTheme()
 
 
@@ -856,7 +867,7 @@ ggplot(correlation.long, aes(Value, countoverdose)) +
   geom_smooth(method = "lm", se = FALSE, colour = "black") +
   facet_wrap(~Variable, ncol = 5, scales = "free") +
   labs(title = "Narcotics Incidents count as a function of risk factors",
-       caption = "fig 5") +
+       caption = "figure 6.") +
   plotTheme()+theme(strip.text.x = element_text(size = 10),
                     strip.background = element_rect(fill= '#f0efeb', color=NA))
 ```
@@ -873,14 +884,13 @@ final_net %>%
   scale_y_continuous(breaks = seq(0,1500, by = 200))+
   labs(title="Distribution of Overdose Occurances", subtitle = "Mesa, AZ",
        x="Overdose Occurance Count", y="Frequency", 
-       caption = "fig 6") +plotTheme()
+       caption = "figure 7.") +plotTheme()
 ```
 </div>
 <br>
 
-
 # POISSON REGRESSION
-```{r reg, results='hide', echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r reg, results='hide', echo=FALSE, message=FALSE, warning=FALSE}
 ## define the variables we want
 
 #Just Risk Factors
@@ -968,7 +978,7 @@ error_by_reg_and_fold %>% ggplot(aes(MAE))+
   facet_wrap(~Regression)+
   geom_vline(xintercept= 0)+scale_x_continuous(breaks=seq(0,8,by=1))+
   labs(title='Distribution of MAE', subtitle='k-fold cross validation vs. LOGO-CV',
-       x= 'Mean Absolute Erorr', y = 'Count')+plotTheme()+theme(strip.text.x = element_text(size = 10),
+       x= 'Mean Absolute Erorr', y = 'Count', caption = 'figure 8.')+plotTheme()+theme(strip.text.x = element_text(size = 10),
                     strip.background = element_rect(fill= '#f0efeb', color=NA))
 
 ```
@@ -984,7 +994,7 @@ ggplot() +
   scale_fill_viridis(option = "F", direction = -1) +
   scale_colour_viridis(option = "F", direction = -1) +
   facet_wrap(~Regression) +  
-  labs(title="Narcotics Incidents Errors", subtitle = "Random K-Fold and Spatial Cross Validation", caption = "fig #") +
+  labs(title="Narcotics Incidents Errors", subtitle = "Random K-Fold and Spatial Cross Validation", caption = "figure 9.") +
   mapTheme()+theme(strip.text.x = element_text(size = 10),
                     strip.background = element_rect(fill= '#f0efeb', color=NA))
 ```
@@ -1010,7 +1020,8 @@ error_by_reg_and_fold%>%
   facet_wrap(~Regression)+
   scale_fill_viridis(option = "F", direction = -1) +
   labs(title='Distribution of MAE', subtitle='k-fold cross validation vs. LOGO-CV',
-       x= 'Mean Absolute Erorr', y = 'Count')+mapTheme()
+       x= 'Mean Absolute Erorr', y = 'Count', caption = 'figure 10.')+mapTheme()+theme(strip.text.x = element_text(size = 10),
+                    strip.background = element_rect(fill= '#f0efeb', color=NA))
 ```
 </div>
 <br>
@@ -1040,14 +1051,15 @@ filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>%
 ```
 
 <div class="plot">
-```{r reg.pred.map, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =8}
+```{r reg.pred.map, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =6}
 
 grid.arrange(
   reg.summary%>%filter(Regression == "Spatial LOGO-CV: Just Risk Factors")%>%
     ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
     scale_fill_viridis(option = "F", direction = -1) +
     scale_colour_viridis(option = "F", direction = -1)+
-    labs(title='Spatial LOGO-CV: Just Risk Factors')+mapTheme()+theme(panel.border=element_blank(),
+    labs(title='Spatial LOGO-CV: \nJust Risk Factors',
+         caption = 'figure 11.')+mapTheme()+theme(panel.border=element_blank(),
                                                       title = element_text(size = 12),
                                                                       legend.position = "bottom",
                                                                       legend.key.size = unit(.5, 'cm')),
@@ -1056,7 +1068,7 @@ grid.arrange(
     scale_fill_viridis(option = "F", direction = -1) +
     scale_colour_viridis(option = "F", direction = -1)+
 
-    labs(title='Spatial LOGO-CV: Spatial Process')+mapTheme()+theme(panel.border=element_blank(),
+    labs(title='Spatial LOGO-CV: \nSpatial Process')+mapTheme()+theme(panel.border=element_blank(),
                                                       title = element_text(size = 12),
                                                                     legend.position = "bottom",
                                                                     legend.key.size = unit(.5, 'cm')),
@@ -1064,7 +1076,7 @@ grid.arrange(
     geom_sf(data = reg.summary, aes(fill = countoverdose, colour = countoverdose))+
     scale_fill_viridis(option = "F", direction = -1) +
     scale_colour_viridis(option = "F", direction = -1)+
-    labs(title='Observed Overdoses')+mapTheme()+theme(panel.border=element_blank(),
+    labs(title='Observed \nOverdoses')+mapTheme()+theme(panel.border=element_blank(),
                                                       title = element_text(size = 12),
                                                       legend.position = "bottom",
                                                       legend.key.size = unit(.5, 'cm')), nrow=1)
@@ -1086,14 +1098,15 @@ st_drop_geometry(reg.summary) %>%
   geom_point(size = 2) + geom_path(aes(group = overdose_Decile), colour = "black") +
   scale_shape_manual(values = c(2, 17)) +
   facet_wrap(~Regression) + xlim(0,10) +
-  labs(title = "Predicted and observed burglary by observed burglary decile")  +
+  labs(title = "Predicted and observed burglary by observed burglary decile",
+       caption = 'figure 12.')  +
   plotTheme()+theme(strip.text.x = element_text(size = 10),
                     strip.background = element_rect(fill= '#f0efeb', color=NA))
 ```
 </div>
 <br>
 
-```{r gen.table, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =4}
+```{r bg, results='hide', echo=FALSE, message=FALSE, warning=FALSE}
 
 #Test  generalizability across block group
 #Get 2018 Data
@@ -1107,6 +1120,10 @@ blockgroups19 <- get_acs(geography = "block group", variables = c("B01003_001","
   mutate(Pct.Hisp = HispTotal/TotalPop,
          raceContext = ifelse(Pct.Hisp > .5, "Majority_Hispanic", "Majority_Non_Hispanic")) %>%
   .[mesa_tracts17,]
+
+```
+
+```{r gen.table, echo=FALSE, message=FALSE, warning=FALSE, fig.width =10,fig.height =4}
 
 reg.summary %>%
   st_centroid() %>%
@@ -1139,7 +1156,8 @@ p1<- ggplot()+
   guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
   labs(subtitle = '2017',
        fill = 'Density',
-       size = 'Count at nearest\n 1/3 mi. interval')+
+       size = 'Count at nearest\n 1/3 mi. interval',
+       caption = 'figure 13.')+
   scale_size_continuous(breaks=seq(1, 61, by=15),
                         range = c(1,10))+ mapTheme()+theme(legend.key.size = unit(.65, 'cm'))
 
@@ -1263,7 +1281,7 @@ rbind(opioid_KDE_sf , opioid_risk_sf) %>%
   facet_wrap(~label, ) +
   scale_fill_viridis(option = "F", direction =-1, discrete = TRUE, alpha = .75) +
   labs(title="Comparison of Kernel Density and Risk Predictions",
-       subtitle="2017 Overdose Risk Predictions; 2018 Overdose", caption = "fig 8") +
+       subtitle="2017 Overdose Risk Predictions; 2018 Overdose", caption = "figure 14.") +
   mapTheme()+theme(strip.text.x = element_text(size = 10),
                     strip.background = element_rect(fill= '#f0efeb', color=NA))
 
@@ -1288,7 +1306,8 @@ rbind(opioid_KDE_sf , opioid_risk_sf) %>%
   ggplot(aes(Risk_Category,Rate_of_test_set_overdose)) +
   geom_bar(aes(fill=label), position="dodge", stat="identity") +
   scale_fill_manual(values=c('#f69c73', "#721f58"))+
-  labs(title = "Risk prediction vs. Kernel density, 2018 burglaries") +
+  labs(title = "Risk prediction vs. Kernel density, 2018 burglaries",
+       caption = 'figure 15.') +
   plotTheme() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
 ```
 </div>
@@ -1296,10 +1315,15 @@ rbind(opioid_KDE_sf , opioid_risk_sf) %>%
 
 # CONCLUSION 
 
+
+### REFERENCES
+
+^1^ [Opioid Overdose - *A Public Health Emergency; What does opioid overdose look like in Mesa?*](https://data.mesaaz.gov/stories/s/Opioid-Overdose-A-Public-Health-Emergency/ma3e-anqw/)
+
 ### CODE APPENDIX
 ```{r get-labels, echo = FALSE}
 labs = knitr::all_labels()
-labs = setdiff(labs, c("setup", "get-labels"))
+labs = setdiff(labs, "get-labels")
 ```
 
 ```{r all-code, ref.label=labs, eval=FALSE}
