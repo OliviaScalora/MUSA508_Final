@@ -690,12 +690,8 @@ LDR_center<- st_centroid(LD_Residential)%>%mutate(Legend = "Low Density Resident
 #Create polygon centroid
 HDR_center<- st_centroid(HD_Residential)%>%mutate(Legend = "High Density Residential")
 
-
-# cluster downtown polygons that are within 100 ft of one another
-# Downtown_R<- clusterSF(Downtown,1000)
 #Create polygon centroid
 DT_center<- st_centroid(Downtown)%>%mutate(Legend = "Downtown")
-
 
 #join zones to fishnet + plot
 zone_vars_net <- 
@@ -710,6 +706,9 @@ zone_vars_net <-
   dplyr::select(-`<NA>`) %>%
   na.omit() %>%
   ungroup()
+# 
+# zone_vars_net <- zone_vars_net%>%mutate(downtown_distance =
+#               nn_function(st_coordinates(st_centroid(zone_vars_net)), st_coordinates(DT_center),3))
 
 zone_vars_net.long <- 
   gather(zone_vars_net, Variable, value, -geometry, -uniqueID)
@@ -724,6 +723,7 @@ for(i in zone_vars){
     labs(title=i) +
     mapTheme()
   }
+
 
 do.call(grid.arrange,c(zone_mapList, ncol=3, top="Density of Zone Type by Fishnet"))
 
@@ -904,6 +904,7 @@ for(i in census_vars.nn){
 }
 
 do.call(grid.arrange,c(census_mapList.nn, ncol=3, top="Risk Factor by Fishnet"))
+
 
 #----MERGE ALL VARIABLES TO FISHNET----
 

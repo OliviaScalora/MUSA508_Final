@@ -43,7 +43,7 @@ library(maptools)
 library(dplyr)
 library(units)
 library(geojsonio)
-library(prettydoc)
+library(cowplot)
 
 options(scipen=999)
 options(tigris_class = "sf")
@@ -102,6 +102,13 @@ mapTheme<- function(base_size = 12, title_size = 16) {
     strip.text.x = element_text(size = 14),
     legend.key = element_rect(fill=NA))
 }
+
+g_legend<-function(a.gplot){
+  tmp <- ggplot_gtable(ggplot_build(a.gplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)
+  }
 
 ```
 
@@ -386,14 +393,11 @@ ggplot()+
   geom_sf(data = opioid_data17%>%distinct(geometry, .keep_all = TRUE),
           aes(size = count),
           color = '#e5383b', alpha = .5)+
-  scale_fill_manual(values = c("#4281a4","#9cafb7", "#db534b", "#fe938c", "#ead2ac"),
+  scale_fill_manual(values = c("#4281a4","#9cafb7", "#f26847", "#f6ad85", "#faebdd"),
                     labels=c('High Density Res','Low Density Res','Downtown','Commercial','Industrial')) +
   scale_size_continuous(breaks=seq(1, 4, by=1),
                         range = c(1,20))+
-  geom_sf(data=city_boundary,
-          color = 'black',
-          size = 1,
-          fill = NA)+
+  geom_sf(data=city_boundary,color = 'black',size = 1,fill = NA)+
   guides(size = guide_legend(override.aes = list(size = c(1,4,8,10))))+
   labs(size = 'Count at nearest\n 1/3 mi. interval', fill = 'Zone Type',
        caption = 'fig.',
@@ -409,6 +413,10 @@ ggplot()+
 
 ```
 </div>
+<br>
+
+
+### EXPLORATORY ANALYSIS
 
 ```{r fishnet, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
@@ -433,7 +441,7 @@ opioid_net <-
 ```
 
 <div class="plot">
-```{r fishnet.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r fishnet.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =10, fig.height = 7}
 #opioid fishnet plot
 ggplot() +
   geom_sf(data = opioid_net, aes(fill = countoverdose), color= NA)+
@@ -444,7 +452,7 @@ ggplot() +
   mapTheme()
 ```
 </div>
-
+<br>
 ```{r zone.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 #----JOIN ZONING DATA TO FISHNET----
@@ -468,11 +476,8 @@ LDR_center<- st_centroid(LD_Residential)%>%mutate(Legend = "Low Density Resident
 #Create polygon centroid
 HDR_center<- st_centroid(HD_Residential)%>%mutate(Legend = "High Density Residential")
 
-
-# Downtown
 #Create polygon centroid
 DT_center<- st_centroid(Downtown)%>%mutate(Legend = "Downtown")
-
 
 #join zones to fishnet + plot
 zone_vars_net <- 
@@ -500,18 +505,19 @@ for(i in zone_vars){
     scale_fill_viridis(option = 'F', direction = -1) +
     labs(title=i) +
     mapTheme()+ theme(legend.position="bottom",
-                      legend.key.size = unit(.3, 'cm'))
-  }
+                      legend.key.size = unit(.5, 'cm'))
+}
+
 ```
 
 <div class="plot">
-```{r zone.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r zone.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
 
-do.call(grid.arrange,c(zone_mapList, ncol=3, top="Density of Zone Type by Fishnet"))
+do.call(grid.arrange,c(zone_mapList, ncol=2, top="Density of Zone Type by Fishnet"))
 
 ```
 </div>
-
+<br>
 ```{r crime.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 #----JOIN CRIME DATA TO FISHNET----
@@ -539,18 +545,19 @@ for(i in crime_vars){
     geom_sf(data = filter(crime_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
     scale_fill_viridis(option = 'F', direction = -1) +
     labs(title=i) +
-    mapTheme()+ theme(legend.position="bottom")
+    mapTheme()+ theme(legend.position="bottom",
+                      legend.key.size = unit(.5, 'cm'))
 }
 ```
 
 <div class="plot">
-```{r crime.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r crime.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 5}
 
 do.call(grid.arrange,c(crime_mapList, ncol=2, top="Risk Factor by Fishnet"))
 
 ```
 </div>
-
+<br>
 ```{r point.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 #----JOIN POINT VARIABLES TO FISHNET----
@@ -580,19 +587,20 @@ for(i in point_vars){
     geom_sf(data = filter(point_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
     scale_fill_viridis(option = 'F', direction = -1) +
     labs(title=i) +
-    mapTheme()+ theme(legend.position="bottom")
+    mapTheme()+ theme(legend.position="bottom",
+                      legend.key.size = unit(.5, 'cm'))
 }
 
 ```
 
 <div class="plot">
-```{r point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 15}
 
-do.call(grid.arrange,c(point_mapList, ncol=3, top="Risk Factor by Fishnet"))
+do.call(grid.arrange,c(point_mapList, ncol=2, top="Risk Factor by Fishnet"))
 
 ```
 </div>
-
+<br>
 ```{r point.nn.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 #----JOIN POINT NN VARIABLES TO FISHNET----
@@ -628,18 +636,18 @@ for(i in point_vars.nn){
     geom_sf(data = filter(point_vars_net.nn.long, Variable == i), aes(fill=value), colour=NA) +
     scale_fill_viridis(option = 'F', direction = -1) +
     labs(title=i) +
-    mapTheme()+ theme(legend.position="bottom")
+    mapTheme()+ theme(legend.position="bottom",
+                      legend.key.size = unit(.5, 'cm'))
 }
 
-do.call(grid.arrange,c(point_mapList.nn, ncol=4, top="Nearest Neighbor Risk Factors by Fishnet"))
 ```
 
 <div class="plot">
-```{r point.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
-do.call(grid.arrange,c(point_mapList.nn, ncol=4, top="Nearest Neighbor Risk Factors by Fishnet"))
+```{r point.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 15}
+do.call(grid.arrange,c(point_mapList.nn, ncol=2, top="Nearest Neighbor Risk Factors by Fishnet"))
 ```
 </div>
-
+<br>
 ```{r census.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
  #----JOINING CENSUS VARIABLES TO FISHNET----
@@ -669,7 +677,8 @@ for(i in census_vars){
     geom_sf(data = filter(census_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
     scale_fill_viridis(option = 'F', direction = -1) +
     labs(title=i) +
-    mapTheme()+ theme(legend.position="bottom")
+    mapTheme()+ theme(legend.position="bottom",
+                      legend.key.size = unit(.5, 'cm'))
 }
 
 #GRID SHOWS how many block groups each cell of fishnet intersects with that are defined as each variable. 
@@ -677,13 +686,13 @@ for(i in census_vars){
 ```
 
 <div class="plot">
-```{r census.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r census.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
 
-do.call(grid.arrange,c(census_mapList, ncol=3, top="Risk Factor by Fishnet"))
+do.call(grid.arrange,c(census_mapList, ncol=2, top="Risk Factor by Fishnet"))
 
 ```
 </div>
-
+<br>
 ```{r census.nn.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
  #----JOINING CENSUS VARIABLES TO FISHNET----
@@ -715,16 +724,17 @@ for(i in census_vars.nn){
     geom_sf(data = filter(census_vars_net.nn.long, Variable == i), aes(fill=value), colour=NA) +
     scale_fill_viridis(option = 'F', direction = -1) +
     labs(title=i) +
-    mapTheme()+ theme(legend.position="bottom")
+    mapTheme()+ theme(legend.position="bottom",
+                      legend.key.size = unit(.5, 'cm'))
 }
 ```
 
 <div class="plot">
-```{r census.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
-do.call(grid.arrange,c(census_mapList.nn, ncol=3, top="Risk Factor by Fishnet"))
+```{r census.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
+do.call(grid.arrange,c(census_mapList.nn, ncol=2, top="Risk Factor by Fishnet"))
 ```
 </div>
-
+<br>
 
 ```{r merge.vars, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
@@ -788,7 +798,9 @@ for(i in vars){
             aes(fill = Value), colour=NA) +
     scale_fill_viridis(option = "F", direction = -1) +
     labs(title=i) +
-    mapTheme() + theme(legend.position="bottom")}
+    mapTheme() + theme(legend.position="bottom",
+                      legend.key.size = unit(.5, 'cm'))
+  }
 
 final_net <- final_net %>% 
   mutate(overdose.isSig = 
@@ -803,9 +815,9 @@ final_net.long <-
 ```
 
 <div class="plot">
-```{r local.moran.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r local.moran.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE,fig.width =10, fig.height =10}
 
-do.call(grid.arrange,c(varList, ncol = 4, top = "Local Morans I statistics, Mesa, AZ Overdose Incidents", bottom = "fig 4"))
+do.call(grid.arrange,c(varList, ncol = 2, top = "Local Morans I statistics, Mesa, AZ Overdose Incidents", bottom = "fig 4"))
 
 ggplot() +
       geom_sf(data = filter(final_net.long, Variable == "overdose.isSig.dist"), 
@@ -819,17 +831,472 @@ ggplot() +
 
 ```
 </div>
+<br>
 
+<div class="plot">
+```{r corr.plot, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10, fig.height =16}
+#----CORRELATION PLOTS----
 
+#### for counts
+correlation.long <-
+  st_drop_geometry(final_net) %>%
+  dplyr::select(-uniqueID, -cvID, -GEOID) %>%
+  gather(Variable, Value, -countoverdose)
+
+##### for nn
+correlation.cor <-
+  correlation.long %>%
+  group_by(Variable) %>%
+  summarize(correlation = cor(Value, countoverdose, use = "complete.obs"))
+
+ggplot(correlation.long, aes(Value, countoverdose)) +
+  geom_point(size = 1, color = '#223843') +
+  geom_text(data = correlation.cor, aes(label = paste("r =", round(correlation, 2))),
+            x=-Inf, y=Inf, vjust = 1.5, hjust = -.1) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  facet_wrap(~Variable, ncol = 5, scales = "free") +
+  labs(title = "Narcotics Incidents count as a function of risk factors",
+       caption = "fig 5") +
+  plotTheme()+theme(strip.text.x = element_text(size = 10),
+                    strip.background = element_rect(fill= '#f0efeb', color=NA))
+```
+</div>
+<br>
+
+<div class="plot">
+```{r hist1, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10}
+
+final_net %>%
+  ggplot(aes(countoverdose,))+
+  geom_histogram(bins = 10, colour="black", fill = '#f69c73') +
+  scale_x_continuous(breaks = seq(0, 20, by = 2)) + 
+  scale_y_continuous(breaks = seq(0,1500, by = 200))+
+  labs(title="Distribution of Overdose Occurances", subtitle = "Mesa, AZ",
+       x="Overdose Occurance Count", y="Frequency", 
+       caption = "fig 6") +plotTheme()
+```
+</div>
+<br>
 
 
 # POISSON REGRESSION
+```{r reg, results='hide', echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+## define the variables we want
+
+#Just Risk Factors
+reg.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential",  "Downtown", 
+                 "Park.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
+                 "Majority.White", "Majority.Hispanic","Child.Crisis.Center", "Industrial", "misdemeanor", "felony", "lightrail")
+
+#Include Local Moran's I Statistic
+reg.ss.vars <- c("Commercial", "High.Density.Residential", "Low.Density.Residential", "Downtown", 
+                 "Park.nn", "Arts.and.Education.nn", "Police.Fire.nn", "Public.Housing", "Vacant.Property", "Low.Income", "Low.Rent",
+                 "Majority.White", "Majority.Hispanic","Child.Crisis.Center", "Industrial", "misdemeanor", "felony","lightrail", "overdose.isSig.dist", "overdose.isSig")
 
 
-# CROSS VALIDATION
+## RUN REGRESSIONS
+
+#### K-fold
+#Just Risk Factors
+reg.CV <- crossValidate(
+  dataset = final_net,
+  id = "cvID",                           
+  dependentVariable = "countoverdose",
+  indVariables = reg.vars) %>%
+  dplyr::select(cvID, countoverdose, Prediction, geometry)
+
+#Spatial Process
+reg.ss.CV <- crossValidate(
+  dataset = final_net,
+  id = "cvID",                           
+  dependentVariable = "countoverdose",
+  indVariables = reg.ss.vars) %>%
+  dplyr::select(cvID, countoverdose, Prediction, geometry)
 
 
-# CODE APPENDIX
+#### Spatial LOGO-CV
+#Just Risk Factors
+reg.spatialCV <- crossValidate(
+  dataset = final_net,
+  id = "GEOID",                           
+  dependentVariable = "countoverdose",
+  indVariables = reg.vars) %>%
+  dplyr::select(cvID = GEOID, countoverdose, Prediction, geometry)
+
+
+#Spatial Process
+reg.ss.spatialCV <- crossValidate(
+  dataset = final_net,
+  id = "GEOID",                           
+  dependentVariable = "countoverdose",
+  indVariables = reg.ss.vars) %>%
+  dplyr::select(cvID = GEOID, countoverdose, Prediction, geometry)
+
+#### bind
+
+reg.summary <- 
+  rbind(
+    mutate(reg.CV,        Error = Prediction - countoverdose,
+           Regression = "Random k-fold CV: Just Risk Factors"),
+    mutate(reg.ss.CV,        Error = Prediction - countoverdose,
+           Regression = "Random k-fold CV: Spatial Process"),
+    mutate(reg.spatialCV, Error = Prediction - countoverdose,
+           Regression = "Spatial LOGO-CV: Just Risk Factors"),
+    mutate(reg.ss.spatialCV, Error = Prediction - countoverdose,
+           Regression = "Spatial LOGO-CV: Spatial Process")) %>%
+  st_sf() 
+
+# calculate errors by Block Group
+error_by_reg_and_fold <- 
+  reg.summary  %>%
+  group_by(Regression, cvID) %>% 
+  summarize(Mean_Error = mean(Prediction - countoverdose, na.rm = T),
+            MAE = mean(abs(Mean_Error), na.rm = T),
+            SD_MAE = mean(abs(Mean_Error), na.rm = T)) %>%
+  ungroup()
+
+
+```
+
+### CROSS VALIDATION
+<div class="plot">
+```{r hist2, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10}
+
+#----HISTOGRAMS----
+error_by_reg_and_fold %>% ggplot(aes(MAE))+
+  geom_histogram(bins=30, color = 'black', fill = '#f69c73')+
+  facet_wrap(~Regression)+
+  geom_vline(xintercept= 0)+scale_x_continuous(breaks=seq(0,8,by=1))+
+  labs(title='Distribution of MAE', subtitle='k-fold cross validation vs. LOGO-CV',
+       x= 'Mean Absolute Erorr', y = 'Count')+plotTheme()+theme(strip.text.x = element_text(size = 10),
+                    strip.background = element_rect(fill= '#f0efeb', color=NA))
+
+```
+</div>
+<br>
+
+<div class="plot">
+```{r err.space, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =8}
+#-----SPATIAL PLOTS-----
+
+ggplot() +
+  geom_sf(data = reg.summary, aes(fill = Prediction, colour = Prediction)) +
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1) +
+  facet_wrap(~Regression) +  
+  labs(title="Narcotics Incidents Errors", subtitle = "Random K-Fold and Spatial Cross Validation", caption = "fig #") +
+  mapTheme()+theme(strip.text.x = element_text(size = 10),
+                    strip.background = element_rect(fill= '#f0efeb', color=NA))
+```
+</div>
+<br>
+
+```{r Cv.table, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =4}
+st_drop_geometry(error_by_reg_and_fold) %>%
+  group_by(Regression) %>% 
+  summarize(Mean_MAE = round(mean(MAE), 2),
+            SD_MAE = round(sd(MAE), 2)) %>%
+  kable() %>%kable_styling(html_font = 'helvetica')%>%
+  kable_paper()%>%column_spec(c(1,2,3), background = "#f0efeb")%>%row_spec(0, background = "#f0efeb", color= 'black',hline_after = TRUE)
+
+```
+
+<div class="plot">
+```{r dist.MAE, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =6}
+error_by_reg_and_fold%>%
+  filter(str_detect(Regression, 'LOGO'))%>%
+  ggplot()+
+  geom_sf(aes(fill=MAE))+
+  facet_wrap(~Regression)+
+  scale_fill_viridis(option = "F", direction = -1) +
+  labs(title='Distribution of MAE', subtitle='k-fold cross validation vs. LOGO-CV',
+       x= 'Mean Absolute Erorr', y = 'Count')+mapTheme()
+```
+</div>
+<br>
+
+```{r moran.table, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =4}
+
+#----NEIGHBORHOOD WEIGHTS-----
+  
+neighborhood.weights <-
+  filter(error_by_reg_and_fold, Regression == "Spatial LOGO-CV: Spatial Process") %>%
+  group_by(cvID) %>%
+  poly2nb(as_Spatial(.), queen=TRUE) %>%
+  nb2listw(., style="W", zero.policy=TRUE)
+
+filter(error_by_reg_and_fold, str_detect(Regression, "LOGO"))  %>% 
+  st_drop_geometry() %>%
+  group_by(Regression) %>%
+  summarize(Morans_I = moran.mc(abs(Mean_Error), neighborhood.weights, 
+                                nsim = 999, zero.policy = TRUE, 
+                                na.action=na.omit)[[1]],
+            p_value = moran.mc(abs(Mean_Error), neighborhood.weights, 
+                               nsim = 999, zero.policy = TRUE, 
+                               na.action=na.omit)[[3]])%>%
+  kable() %>%kable_styling(html_font = 'helvetica')%>%
+  kable_paper()%>%column_spec(c(1,2,3), background = "#f0efeb")%>%row_spec(0, background = "#f0efeb", color= 'black',hline_after = TRUE)
+
+```
+
+<div class="plot">
+```{r reg.pred.map, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =8}
+
+grid.arrange(
+  reg.summary%>%filter(Regression == "Spatial LOGO-CV: Just Risk Factors")%>%
+    ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
+    scale_fill_viridis(option = "F", direction = -1) +
+    scale_colour_viridis(option = "F", direction = -1)+
+    labs(title='Spatial LOGO-CV: Just Risk Factors')+mapTheme()+theme(panel.border=element_blank(),
+                                                      title = element_text(size = 12),
+                                                                      legend.position = "bottom",
+                                                                      legend.key.size = unit(.5, 'cm')),
+  reg.summary%>%filter(Regression == "Spatial LOGO-CV: Spatial Process")%>%
+    ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
+    scale_fill_viridis(option = "F", direction = -1) +
+    scale_colour_viridis(option = "F", direction = -1)+
+
+    labs(title='Spatial LOGO-CV: Spatial Process')+mapTheme()+theme(panel.border=element_blank(),
+                                                      title = element_text(size = 12),
+                                                                    legend.position = "bottom",
+                                                                    legend.key.size = unit(.5, 'cm')),
+  ggplot() +
+    geom_sf(data = reg.summary, aes(fill = countoverdose, colour = countoverdose))+
+    scale_fill_viridis(option = "F", direction = -1) +
+    scale_colour_viridis(option = "F", direction = -1)+
+    labs(title='Observed Overdoses')+mapTheme()+theme(panel.border=element_blank(),
+                                                      title = element_text(size = 12),
+                                                      legend.position = "bottom",
+                                                      legend.key.size = unit(.5, 'cm')), nrow=1)
+
+```
+</div>
+<br>
+
+<div class="plot">
+```{r pred.obv, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =6}
+st_drop_geometry(reg.summary) %>%
+  group_by(Regression) %>%
+  mutate(overdose_Decile = ntile(countoverdose, 10)) %>%
+  group_by(Regression, overdose_Decile) %>%
+  summarize(meanObserved = mean(countoverdose, na.rm=T),
+            meanPrediction = mean(Prediction, na.rm=T)) %>%
+  gather(Variable, Value, -Regression, -overdose_Decile) %>%          
+  ggplot(aes(overdose_Decile, Value, shape = Variable)) +
+  geom_point(size = 2) + geom_path(aes(group = overdose_Decile), colour = "black") +
+  scale_shape_manual(values = c(2, 17)) +
+  facet_wrap(~Regression) + xlim(0,10) +
+  labs(title = "Predicted and observed burglary by observed burglary decile")  +
+  plotTheme()+theme(strip.text.x = element_text(size = 10),
+                    strip.background = element_rect(fill= '#f0efeb', color=NA))
+```
+</div>
+<br>
+
+```{r gen.table, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =4}
+
+#Test  generalizability across block group
+#Get 2018 Data
+blockgroups19 <- get_acs(geography = "block group", variables = c("B01003_001","B03002_012"), 
+                         year=2019, state=04, county=013, geometry=T) %>% 
+  st_transform('EPSG:2224')  %>% 
+  dplyr::select(variable, estimate, GEOID) %>%
+  spread(variable, estimate) %>%
+  rename(TotalPop = B01003_001,
+         HispTotal = B03002_012) %>%
+  mutate(Pct.Hisp = HispTotal/TotalPop,
+         raceContext = ifelse(Pct.Hisp > .5, "Majority_Hispanic", "Majority_Non_Hispanic")) %>%
+  .[mesa_tracts17,]
+
+reg.summary %>%
+  st_centroid() %>%
+  st_join(blockgroups19) %>%
+  na.omit() %>%
+  st_drop_geometry() %>%
+  group_by(Regression, raceContext) %>%
+  summarize(mean.Error = mean(Error, na.rm = T)) %>%
+  spread(raceContext, mean.Error) %>%
+  kable() %>%kable_styling(html_font = 'helvetica')%>%
+  kable_paper()%>%column_spec(c(1,2,3), background = "#f0efeb")%>%row_spec(0, background = "#f0efeb", color= 'black',hline_after = TRUE)
+```
+
+<div class="plot">
+```{r kd.plot, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =10}
+opioid_data18 <- opioid_data%>%filter(year=='2018')
+
+#kernel density plot 2017-2021
+p1<- ggplot()+
+  geom_sf(data=city_boundary, fill='#22192b', color='black')+
+  stat_density2d(data= data.frame(st_coordinates(opioid_data17)),
+                 aes(X,Y, fill=..level..,alpha=..level..),
+                 size=0.01, bins=40, geom='polygon')+
+  scale_fill_viridis(option = 'F',  direction = 1) +
+  scale_alpha(range=c(0.00,0.35), guide='none')+
+  geom_sf(data = opioid_data17%>%distinct(geometry, .keep_all=TRUE),
+          aes(size = count),
+          color = '#fffaf2',
+          alpha = .5)+
+  guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
+  labs(subtitle = '2017',
+       fill = 'Density',
+       size = 'Count at nearest\n 1/3 mi. interval')+
+  scale_size_continuous(breaks=seq(1, 61, by=15),
+                        range = c(1,10))+ mapTheme()+theme(legend.key.size = unit(.65, 'cm'))
+
+p2<- ggplot()+
+  geom_sf(data=city_boundary, fill='#22192b', color='black')+
+  stat_density2d(data= data.frame(st_coordinates(opioid_data18)),
+                 aes(X,Y, fill=..level..,alpha=..level..),
+                 size=0.01, bins=40, geom='polygon')+
+  scale_fill_viridis(option = 'F',  direction = 1) +
+  scale_alpha(range=c(0.00,0.35), guide='none')+
+  geom_sf(data = opioid_data18%>%distinct(geometry, .keep_all=TRUE),
+          aes(size = count),
+          color = '#fffaf2',
+          alpha = .5)+
+  scale_size_continuous(breaks=seq(1, 61, by=15),
+                        range = c(1,10))+ 
+  guides(size = guide_legend(override.aes = list(color = '#2f273d', alpha=.2)))+
+  labs(subtitle = '2018',
+       fill = 'Density',
+       size = 'Count at nearest\n 1/3 mi. interval')+
+  mapTheme()
+
+p3<- ggplot()+
+  geom_sf(data=city_boundary, fill='#22192b', color='black')+
+  stat_density2d(data= data.frame(st_coordinates(opioid_data17)),
+                 aes(X,Y, fill=..level..,alpha=..level..),
+                 size=0.01, bins=40, geom='polygon')+
+  scale_fill_viridis(option = 'F',  direction = 1) +
+  scale_alpha(range=c(0.00,0.35), guide='none')+
+  labs(subtitle = 'Kernel Density 2017')+ mapTheme()
+
+p4<- ggplot()+
+  geom_sf(data=city_boundary, fill='#22192b', color='black')+
+  stat_density2d(data= data.frame(st_coordinates(opioid_data18)),
+                 aes(X,Y, fill=..level..,alpha=..level..),
+                 size=0.01, bins=40, geom='polygon')+
+  scale_fill_viridis(option = 'F',  direction = 1) +
+  scale_alpha(range=c(0.00,0.35), guide='none')+
+  labs(subtitle = 'Kernel Density 2018')+ mapTheme()
+
+mylegend<-g_legend(p1)
+
+grid.arrange(p3 + theme(legend.position="none"),
+             p4 + theme(legend.position="none"),
+             mylegend, 
+             p1 + theme(legend.position="none"),
+             p2 + theme(legend.position="none"),
+             nrow=2,ncol=3,widths=c(2,2,.5), top = "Opioid Overdose Occurances in Mesa, AZ")
+  
+
+```
+</div>
+<br>
+
+<div class="plot">
+```{r kd.plot18, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =6}
+
+# In this section, we ask whether risk predictions outperform traditional ‘Kernel density’ hotspot mapping. 
+# To add an element of across-time generalizability, 
+# hotspot and risk predictions from these 2017 burglaries are used to predict the location of burglaries from 2018.
+
+#Goodness of fit indicator - illustrate whether the 2017 kernel density or risk predictions capture
+#more of the 2018 burglaries. If the risk predictions capture more observed burglaries than the kernel density,
+#then the risk prediction model provides a more robust targeting tool for allocating police resources.
+
+#Step1 - 2018 opioid data 
+opioid_data18 <- opioid_data%>%filter(year=='2018')
+
+# Step 2
+#Kernel Density for 2017 data
+opioid_ppp <- as.ppp(st_coordinates(opioid_data), W = st_bbox(final_net))
+opioid_KD <- density.ppp(opioid_ppp, 1000)
+
+opioid_KDE_sf <- as.data.frame(opioid_KD) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(final_net)) %>%
+  aggregate(., final_net, mean) %>%
+  mutate(label = "Kernel Density",
+         Risk_Category = ntile(value, 100),
+         Risk_Category = case_when(
+           Risk_Category >= 90 ~ "90% to 100%",
+           Risk_Category >= 70 & Risk_Category <= 89 ~ "70% to 89%",
+           Risk_Category >= 50 & Risk_Category <= 69 ~ "50% to 69%",
+           Risk_Category >= 30 & Risk_Category <= 49 ~ "30% to 49%",
+           Risk_Category >= 1 & Risk_Category  <= 29 ~ "1% to 29%")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(opioid_data18) %>% mutate(overdoseCount = 1), ., sum) %>%
+      mutate(overdoseCount = replace_na(overdoseCount, 0))) %>%
+  dplyr::select(label, Risk_Category, overdoseCount)
+
+# Step 3
+opioid_risk_sf <-
+  filter(reg.summary, Regression == "Spatial LOGO-CV: Spatial Process") %>%
+  mutate(label = "Risk Predictions",
+         Risk_Category = ntile(Prediction, 100),
+         Risk_Category = case_when(
+           Risk_Category >= 90 ~ "90% to 100%",
+           Risk_Category >= 70 & Risk_Category <= 89 ~ "70% to 89%",
+           Risk_Category >= 50 & Risk_Category <= 69 ~ "50% to 69%",
+           Risk_Category >= 30 & Risk_Category <= 49 ~ "30% to 49%",
+           Risk_Category >= 1 & Risk_Category <= 29 ~ "1% to 29%")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(opioid_data18) %>% mutate(overdoseCount = 1), ., sum) %>%
+      mutate(overdoseCount = replace_na(overdoseCount, 0))) %>%
+  dplyr::select(label, Risk_Category, overdoseCount)
+
+# Step 4
+rbind(opioid_KDE_sf , opioid_risk_sf) %>%
+  na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category, -geometry) %>%
+  ggplot() +
+  geom_sf(aes(fill = Risk_Category), colour = NA) +
+  geom_sf(data = opioid_data18%>%distinct(geometry, .keep_all=TRUE),
+          aes(size = count),
+          color = '#000000',
+          alpha = .65)+
+  scale_size_continuous(breaks=seq(1, 75, by=15),
+                        range = c(1,6))+
+  guides(size= guide_legend(title = "2018 Overdoses",override.aes = list(size = c(1,2,4,5,6),color = '#424453',alpha=.45)))+
+  facet_wrap(~label, ) +
+  scale_fill_viridis(option = "F", direction =-1, discrete = TRUE, alpha = .75) +
+  labs(title="Comparison of Kernel Density and Risk Predictions",
+       subtitle="2017 Overdose Risk Predictions; 2018 Overdose", caption = "fig 8") +
+  mapTheme()+theme(strip.text.x = element_text(size = 10),
+                    strip.background = element_rect(fill= '#f0efeb', color=NA))
+
+```
+</div>
+<br>
+
+<div class="plot">
+```{r kd.chart, echo=FALSE, message=FALSE, warning=FALSE,fig.width =8,fig.height =6}
+#calculates the rate of 2018 overdose points by risk category and model type
+# well fit model should show that the risk predictions capture a greater share of 2018 overdoses
+# in the highest risk category relative to the kernel density
+
+rbind(opioid_KDE_sf , opioid_risk_sf) %>%
+  st_set_geometry(NULL) %>% na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category) %>%
+  group_by(label, Risk_Category) %>%
+  summarize(countoverdose = sum(Value)) %>%
+  ungroup() %>%
+  group_by(label) %>%
+  mutate(Rate_of_test_set_overdose = countoverdose / sum(countoverdose)) %>%
+  ggplot(aes(Risk_Category,Rate_of_test_set_overdose)) +
+  geom_bar(aes(fill=label), position="dodge", stat="identity") +
+  scale_fill_manual(values=c('#f69c73', "#721f58"))+
+  labs(title = "Risk prediction vs. Kernel density, 2018 burglaries") +
+  plotTheme() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+```
+</div>
+<br>
+
+# CONCLUSION 
+
+### CODE APPENDIX
 ```{r get-labels, echo = FALSE}
 labs = knitr::all_labels()
 labs = setdiff(labs, c("setup", "get-labels"))
