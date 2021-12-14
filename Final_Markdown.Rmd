@@ -117,9 +117,9 @@ g_legend<-function(a.gplot){
 The opioid crisis in Mesa, Arizona is a public health emergency that must be addressed. A spike in overdoses onset by the COVID-19 pandemic in early 2020 saw an increase of 76% in the number of opioid overdose incidents and a 132% increase in opioid related deaths^1^. The problem is not a new one, however. Due to an alarming increase in opioid deaths in 2016, Governor Ducey declared a state of emergency on June 5, 2017 and the Mesa County Opioid Response Group was established in June 2018 to reduce the community impact of opioids through prevention, treatment, and recovery services.
 The goal of the group is to prevent substance misuse through:   
 
-*   Education of community members & health providers  
-*   Improving treatment access & retention  
-*   Reduce harm by providing educational information and training on Naloxone and how to obtain and use the life-saving overdose reversal drug.     
+- Education of community members & health providers  
+- Improving treatment access & retention  
+- Reduce harm by providing educational information and training on Naloxone and how to obtain and use the life-saving overdose reversal drug.     
   
 The state of emergency was officially terminated in May, 2018, despite the growing numbers. Figure 1, sourced from the [*data.mesaaz.gov*](https://data.mesaaz.gov/stories/s/Opioid-Overdose-A-Public-Health-Emergency/ma3e-anqw/), illustrates the urgency of the increasing overdose incident count, reaching a record high of 211 in September of this year.
 
@@ -140,16 +140,18 @@ We believe in the power of predictive modeling to assist in the critical decisio
 
 ### WRANGLING DATA
 
-Our data sets include:
-**Fire and Medical Opioid Overdose Incidents** - Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.
-**Census ACS data** - demographic and socio-economic indicators at the block group level
-**City Property Data** - will be filtered to account for various facillity type - child crisis center, fire and police station, public housing, arts and education centers
-**Crime Data** - split into misdemeanors and felonies
-**Park Locations And Amenities** - Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.
-**Light Rail Stations** - Shapefile that indicates the lightrail stations that run through Downtown, Mesa.
-**City Boundary Map** - Perimeter of the city boundary
-**Zoning Districs** - Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land - separated between High density residential, low density residential, downtown, commercial, and industrial. 
- <br>
+Our data sets include:  
+
+- **Fire and Medical Opioid Overdose Incidents** Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.  
+- **Census ACS data** demographic and socio-economic indicators at the block group level  
+- **City Property Data** will be filtered to account for various facillity type - child crisis center, fire and police station, public housing, arts and education centers  
+- **Crime Data** split into misdemeanors and felonies  
+- **Park Locations And Amenities** Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.  
+- **Light Rail Stations** Shapefile that indicates the lightrail stations that run through Downtown, Mesa.  
+- **City Boundary Map** Perimeter of the city boundary  
+- **Zoning Districs** Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land - separated between High density residential, low density residential, downtown, commercial, and industrial.   
+
+<br>
 
 ```{r wrangle.data, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
@@ -434,11 +436,12 @@ ggplot()+
                    panel.grid = element_blank())
 
 ```
- <br>
+<br> <br>  
+
 figure 2. illustrates the relationship of zoning districts to the opioid overdose incident points. Because the overdose incident points are rounded to the approximate 1/3 mi. interval for privacy reasons, we have aggregated the amount of overdoses at each point and visualized each point as a graduated symbol representing the count number. This is how overdose points will be illustrated throughout most the analysis.
- <br>
+<br>  
 A spatial boundary, be it a Census block groups, or a police district, is often drawn arbitrarily or does not represent a consistent division of space. We are hoping to analyze the risk of opioid overdose evenly across space and cannot be limited by these boundaries. For this reason, we create a 'fishnet', or grid of cells at 1/3 mi dimensions, to which we will aggregate our point data and the risk predictions will be represented as a smooth surface. Figure 3 illustrates opioid overdose incidents from 2017, where darker pixels indicate a higher count of incidents.
- <br>
+<br>  
 
 ```{r fishnet, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
@@ -460,7 +463,7 @@ opioid_net <-
   mutate(countoverdose = replace_na(countoverdose, 0),
          uniqueID = rownames(.),
          cvID = sample(round(nrow(fishnet) / 24), size=nrow(fishnet), replace = TRUE))
-```
+```  
 
 <div class="plot">
 ```{r fishnet.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =10, fig.height = 7}
@@ -468,13 +471,11 @@ opioid_net <-
 ggplot() +
   geom_sf(data = opioid_net, aes(fill = countoverdose), color= NA)+
   scale_fill_viridis(option = 'F', direction = -1) +
-  labs(title = "Count of Overdoses for the fishnet",
-       subtitle = "Mesa, AZ",
-       caption = "figure 3.") +
+  labs(title = "figure 3: Count of Overdoses for the fishnet",
+       subtitle = "Mesa, AZ") +
   mapTheme()
-```
-</div>
-<br>
+```  
+
 ```{r zone.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 #----JOIN ZONING DATA TO FISHNET----
@@ -530,16 +531,13 @@ for(i in zone_vars){
                       legend.key.size = unit(.5, 'cm'))
 }
 
-```
-
-<div class="plot">
+```  
+<br> <br> 
 ```{r zone.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
 
-do.call(grid.arrange,c(zone_mapList, ncol=2, top="Density of Zone Type by Fishnet", bottom= "figure 4.1"))
+do.call(grid.arrange,c(zone_mapList, ncol=2, top="figure 4.1: Density of Zone Type by Fishnet"))
 
-```
-</div>
-<br>
+```  
 
 ```{r crime.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
@@ -571,16 +569,14 @@ for(i in crime_vars){
     mapTheme()+ theme(legend.position="bottom",
                       legend.key.size = unit(.5, 'cm'))
 }
-```
-
-<div class="plot">
+```  
+<br> <br> 
 ```{r crime.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 5}
 
-do.call(grid.arrange,c(crime_mapList, ncol=2, top="CrimeRisk Factor by Fishnet", bottom= "figure 4.2"))
+do.call(grid.arrange,c(crime_mapList, ncol=2, top="figure 4.2: CrimeRisk Factor by Fishnet"))
 
-```
-</div>
-<br>
+```  
+
 ```{r point.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 #----JOIN POINT VARIABLES TO FISHNET----
@@ -614,16 +610,63 @@ for(i in point_vars){
                       legend.key.size = unit(.5, 'cm'))
 }
 
-```
-
-<div class="plot">
+```  
+<br> <br> 
 ```{r point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 15}
 
-do.call(grid.arrange,c(point_mapList, ncol=2, top="Risk Factor by Fishnet", bottom= "figure 4.3"))
+do.call(grid.arrange,c(point_mapList, ncol=2, top="figure 4.3: Risk Factor by Fishnet"))
 
+```  
+
+```{r census.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+ #----JOINING CENSUS VARIABLES TO FISHNET----
+
+#Point data to fishnet
+census_vars_net<- 
+  rbind(high_vacancy_bg, low_med_rent_BG, low_inc_BG, white_bg, hisp_bg) %>%
+  st_join(fishnet, ., join=st_intersects) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID,Legend) %>%
+  summarize(count = n()) %>%
+  full_join(fishnet) %>%
+  spread(Legend, count, fill=0) %>%
+  st_sf() %>%
+  dplyr::select(-`<NA>`) %>%
+  na.omit() %>%
+  ungroup()
+
+census_vars_net.long <- 
+  gather(census_vars_net, Variable, value, -geometry, -uniqueID)
+census_vars <- unique(census_vars_net.long$Variable)
+census_mapList <- list()
+
+for(i in census_vars){
+  census_mapList[[i]] <- 
+    ggplot() +
+    geom_sf(data = filter(census_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
+    scale_fill_viridis(option = 'F', direction = -1) +
+    labs(title=i) +
+    mapTheme()+ theme(legend.position="bottom",
+                      legend.key.size = unit(.5, 'cm'))
+}
+
+#GRID SHOWS how many block groups each cell of fishnet intersects with that are defined as each variable. 
+#max interesection is 4,5,and 6. 
 ```
+<br> <br> 
+```{r census.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
+
+do.call(grid.arrange,c(census_mapList, ncol=2, top="figure 4.4: Census Variable by Fishnet"))
+
+```  
 </div>
-<br>
+<br>  
+
+figures 4.1 - 4.4 follow the same process, but with our independent variables wrangled from our data sets.
+Figures 4.5 and 4.6 are a representation of the nearest neighbor function used on our City property and census data.  Tthe nearest neighbor function calculates the average distance of each fishnet cell to the closest 3 points of the variable. this creates a gradiated map because the value of each fishnet cell takes on the calculated average distance. We will determine whether we will use the unaggragated or nearset neighbor version of these variables for the final poisson regression through analysing the correlation of each independent variable to the dependent variable later in the analysis. Our next step is to explore the spatial process of opioid overdoses in Mesa.    
+
+<div class="plot">
 ```{r point.nn.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
 #----JOIN POINT NN VARIABLES TO FISHNET----
@@ -665,51 +708,10 @@ for(i in point_vars.nn){
 
 ```
 
-```{r census.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
-
- #----JOINING CENSUS VARIABLES TO FISHNET----
-
-#Point data to fishnet
-census_vars_net<- 
-  rbind(high_vacancy_bg, low_med_rent_BG, low_inc_BG, white_bg, hisp_bg) %>%
-  st_join(fishnet, ., join=st_intersects) %>%
-  st_drop_geometry() %>%
-  group_by(uniqueID,Legend) %>%
-  summarize(count = n()) %>%
-  full_join(fishnet) %>%
-  spread(Legend, count, fill=0) %>%
-  st_sf() %>%
-  dplyr::select(-`<NA>`) %>%
-  na.omit() %>%
-  ungroup()
-
-census_vars_net.long <- 
-  gather(census_vars_net, Variable, value, -geometry, -uniqueID)
-census_vars <- unique(census_vars_net.long$Variable)
-census_mapList <- list()
-
-for(i in census_vars){
-  census_mapList[[i]] <- 
-    ggplot() +
-    geom_sf(data = filter(census_vars_net.long, Variable == i), aes(fill=value), colour=NA) +
-    scale_fill_viridis(option = 'F', direction = -1) +
-    labs(title=i) +
-    mapTheme()+ theme(legend.position="bottom",
-                      legend.key.size = unit(.5, 'cm'))
-}
-
-#GRID SHOWS how many block groups each cell of fishnet intersects with that are defined as each variable. 
-#max interesection is 4,5,and 6. 
+```{r point.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 15}
+do.call(grid.arrange,c(point_mapList.nn, ncol=2, top="figure 4.5: Nearest Neighbor Risk Factors by Fishnet"))
 ```
 
-<div class="plot">
-```{r census.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
-
-do.call(grid.arrange,c(census_mapList, ncol=2, top="Census Variable by Fishnet", bottom= "figure 4.4"))
-
-```
-</div>
-<br>
 ```{r census.nn.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
 
  #----JOINING CENSUS VARIABLES TO FISHNET----
@@ -745,20 +747,9 @@ for(i in census_vars.nn){
                       legend.key.size = unit(.5, 'cm'))
 }
 ```
-figures 4.1 - 4.4 follow the same process, but with our independent variables wrangled from our data sets.
-Figures 4.5 and 4.6 are a representation of the nearest neighbor function used on our City property and census data.  Tthe nearest neighbor function calculates the average distance of each fishnet cell to the closest 3 points of the variable. this creates a gradiated map because the value of each fishnet cell takes on the calculated average distance. We will determine whether we will use the unaggragated or nearset neighbor version of these variables for the final poisson regression through analysing the correlation of each independent variable to the dependent variable later in the analysis. Our next step is to explore the spatial process of opioid overdoses in Mesa.  
 
-<br>
-<div class="plot">
-```{r point.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 15}
-do.call(grid.arrange,c(point_mapList.nn, ncol=2, top="Nearest Neighbor Risk Factors by Fishnet", bottom= "figure 4.5"))
-```
-</div>
-<br>
-
-<div class="plot">
 ```{r census.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
-do.call(grid.arrange,c(census_mapList.nn, ncol=2, top="Census Variable Nearest Neighbor by Fishnet", bottom= "figure 4.6"))
+do.call(grid.arrange,c(census_mapList.nn, ncol=2, top="figure 4.6: Census Variable Nearest Neighbor by Fishnet"))
 ```
 </div>
 <br>
@@ -842,7 +833,7 @@ final_net.long <-
 ```
 <br>
 
-To test the spatialo process, we us a statistic called Local Moran’s I. Here, the null hypothesis is that the overdose count at a given location is randomly distributed relative to its immediate neighbors. We create a neighbor list and a spatial weights index using **queen contiguity.**  Our output, figure 5.1, depicts where there is relatively high local clustering of overdose incidents. 
+To test the spatialo process, we us a statistic called Local Moran’s I. Here, the null hypothesis is that the overdose count at a given location is randomly distributed relative to its immediate neighbors. We create a neighbor list and a spatial weights index using *queen contiguity.*  Our output, figure 5.1, depicts where there is relatively high local clustering of overdose incidents. 
 
 
 <div class="plot">
@@ -1342,6 +1333,7 @@ rbind(opioid_KDE_sf , opioid_risk_sf) %>%
 ^1^ [Opioid Overdose - *A Public Health Emergency; What does opioid overdose look like in Mesa?*](https://data.mesaaz.gov/stories/s/Opioid-Overdose-A-Public-Health-Emergency/ma3e-anqw/)
 
 ### CODE APPENDIX
+
 ```{r get-labels, echo = FALSE}
 labs = knitr::all_labels()
 labs = setdiff(labs, "get-labels")

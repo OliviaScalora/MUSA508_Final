@@ -353,7 +353,7 @@ crime <- st_as_sf(na.omit(crime),
 
 
 crime  <- crime [city_boundary,]
-# unique(crime$national_incident_based_crime_reporting_description)
+unique(crime$national_incident_based_crime_reporting_description)
 
 misdemeanor<- crime%>%
   filter(national_incident_based_crime_reporting_description %in% 
