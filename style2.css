@@ -22,3 +22,7 @@ div.plot {
           border-radius: 15px;
           background-color: white;
           }
+
+div.map {
+        background-color: #f0efeb;
+        }
