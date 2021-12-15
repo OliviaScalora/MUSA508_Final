@@ -443,6 +443,8 @@ ggplot()+
 figure 2. illustrates the relationship of zoning districts to the opioid overdose incident points. Because the overdose incident points are rounded to the approximate 1/3 mi. interval for privacy reasons, we have aggregated the amount of overdoses at each point and visualized each point as a graduated symbol representing the count number. This is how overdose incident points will be illustrated throughout most of the analysis.
 <br>  
 A municipal or government boundary, be it a Census block group, or a police district, is often drawn arbitrarily or does not represent a consistent division of space. We are hoping to analyze the risk of opioid overdose evenly across space and cannot be limited by these boundaries. For this reason, we create a 'fishnet', or grid of cells at 1/3 mi dimensions, to which we will aggregate our point data. The risk predictions will be represented as a smooth surface. Figure 3 illustrates opioid overdose incidents from 2017, where darker pixels indicate a higher count of incidents.
+
+figures 4.1 - 4.4 follow the same process, but with our independent variables wrangled from our data sets.
 <br>  
 
 ```{r fishnet, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
@@ -537,7 +539,7 @@ for(i in zone_vars){
 
 ```  
 <br> 
-```{r zone.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 10}
+```{r zone.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =8, fig.height = 10}
 
 do.call(grid.arrange,c(zone_mapList, ncol=2, top="figure 4.1: Density of Zone Type by Fishnet"))
 
@@ -575,7 +577,7 @@ for(i in crime_vars){
 }
 ```  
 <br> 
-```{r crime.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 4}
+```{r crime.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =8, fig.height = 4}
 
 do.call(grid.arrange,c(crime_mapList, ncol=2, top="figure 4.2: CrimeRisk Factor by Fishnet"))
 
@@ -616,7 +618,7 @@ for(i in point_vars){
 
 ```  
 <br>  
-```{r point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 15}
+```{r point.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =8, fig.height = 15}
 
 do.call(grid.arrange,c(point_mapList, ncol=2, top="figure 4.3: Risk Factor by Fishnet"))
 
@@ -659,13 +661,18 @@ for(i in census_vars){
 #max interesection is 4,5,and 6. 
 ```
 <br>
-```{r census.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 12}
+```{r census.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =8, fig.height = 12}
 
 do.call(grid.arrange,c(census_mapList, ncol=2, top="figure 4.4: Census Variable by Fishnet"))
 
 ```  
 </div>
 <br>  
+
+
+### NEAREST NEIGHBOR    
+  
+Figures 4.5 and 4.6 are a representation of the nearest neighbor function used on our City property and census data.  The nearest neighbor function calculates the average distance of each fishnet cell to the closest 3 points of the variable. this creates a gradiated map because the value of each fishnet cell takes on the calculated average distance. We will determine whether we will use the unaggregated or nearest neighbor version of these variables for the final poisson regression through analyzing the correlation of each independent variable to the dependent variable later in the analysis. Our next step is to explore the spatial process of opioid overdoses in Mesa.    
 
 <div class="plot">
 ```{r point.nn.join, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
@@ -709,7 +716,7 @@ for(i in point_vars.nn){
 
 ```
 
-```{r point.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 15}
+```{r point.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =8, fig.height = 15}
 do.call(grid.arrange,c(point_mapList.nn, ncol=2, top="figure 4.5: Nearest Neighbor Risk Factors by Fishnet"))
 ```
 
@@ -749,7 +756,7 @@ for(i in census_vars.nn){
 }
 ```
 
-```{r census.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =7, fig.height = 12}
+```{r census.nn.plot, echo=FALSE, results='hide', message=FALSE, warning=FALSE, fig.width =8, fig.height = 12}
 do.call(grid.arrange,c(census_mapList.nn, ncol=2, top="figure 4.6: Census Variable Nearest Neighbor by Fishnet"))
 ```
 </div>
@@ -834,17 +841,15 @@ final_net.long <-
 ```
 <br>
 
-figures 4.1 - 4.4 follow the same process, but with our independent variables wrangled from our data sets.
-Figures 4.5 and 4.6 are a representation of the nearest neighbor function used on our City property and census data.  The nearest neighbor function calculates the average distance of each fishnet cell to the closest 3 points of the variable. this creates a gradiated map because the value of each fishnet cell takes on the calculated average distance. We will determine whether we will use the unaggregated or nearest neighbor version of these variables for the final poisson regression through analyzing the correlation of each independent variable to the dependent variable later in the analysis. Our next step is to explore the spatial process of opioid overdoses in Mesa.   
 
 ### LOCAL MORAN'S I     
   
 To test the spatial process, we us a statistic called Local Moran’s I. Here, the null hypothesis is that the overdose count at a given location is randomly distributed relative to its immediate neighbors. We create a neighbor list and a spatial weights index using *queen contiguity.*  Our output, figure 5.1, depicts where there is relatively high local clustering of overdose incidents. We see this clustering also represented in the spatial process of the p-value, where lighter pixel colors represent a lower p-value. If our null hypothesis states that there is no significant local clustering, a p-value <= 0.05 indicates the areas in which we can reject the null hypothesis in favor of the alternative hypothesis, that there is in fact local clustering. The significant hot spots are created from the fishnet pixels that have a p-value <= 0.05. 
 
-Figure 5.2 illustrates the distance function used on our significant hotspot output, thus creating a value for each fishnet cell that represents the distance between the centroid of the cell to the nearest significant cluster. This value will be used as a predictive feature in our poisson regression model. 
+Figure 5.2 illustrates the distance function used on our significant hot spot output, thus creating a value for each fishnet cell that represents the distance between the centroid of the cell to the nearest significant cluster. This value will be used as a predictive feature in our poisson regression model. 
 
 <div class="plot">
-```{r local.moran.plot, echo=FALSE, message=FALSE, warning=FALSE,fig.width =6, fig.height =6}
+```{r local.moran.plot, echo=FALSE, message=FALSE, warning=FALSE,fig.width =8, fig.height =6}
 
 do.call(grid.arrange,c(varList, ncol = 2, top = "figure 5.1: Local Morans I statistics, Mesa, AZ Overdose Incidents"))
 ```
@@ -870,19 +875,6 @@ For the final step of our exploratory analysis, we plot the Pearson correlation 
 
 <br>
 <div class="plot">
-```{r corr.plot1, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10, fig.height =10}
-numericVars <-
-  select_if(st_drop_geometry(final_net), is.numeric) %>% na.omit()
-
-ggcorrplot(
-  round(cor(numericVars), 1),
-  p.mat = cor_pmat(numericVars),
-  colors = c("#721f58", "#f0efeb", "#f06c30"),
-  type="lower",
-  insig = "blank") +
-  labs(title = "Correlation across numeric variables", 
-       caption = 'figure 6.1')
-```
 
 ```{r corr.plot, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10, fig.height =16}
 #----CORRELATION PLOTS----
@@ -906,14 +898,41 @@ ggplot(correlation.long, aes(Value, countoverdose)) +
   geom_smooth(method = "lm", se = FALSE, colour = "black") +
   facet_wrap(~Variable, ncol = 5, scales = "free") +
   labs(title = "Narcotics Incidents count as a function of risk factors",
-       caption = "figure 6.2") +
+       caption = "figure 6.1") +
   plotTheme()+theme(strip.text.x = element_text(size = 10),
                     strip.background = element_rect(fill= '#f0efeb', color=NA))
 
 ```
 </div>
 <br>
+<div class="map" style="object-fit: cover; border: 10px solid #f0efeb;">
+```{r corr.plot1, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10.1, fig.height =9.35}
+numericVars <-
+  select_if(st_drop_geometry(final_net), is.numeric) %>% na.omit()
 
+ggcorrplot(
+  round(cor(numericVars), 1),
+  p.mat = cor_pmat(numericVars),
+  colors = c("#40042d", "#f0efeb", "#f7580f"),
+  type="lower",
+  insig = "blank") +
+  labs(title = "Correlation across numeric variables", 
+       caption = 'figure 6.2')+theme(panel.background = element_rect(fill = "#f0efeb", color = "#f0efeb"),
+                   legend.background = element_rect(fill="#f0efeb", color = "#f0efeb"),
+                   plot.background = element_rect(fill = "#f0efeb", color = "#f0efeb"),
+                   legend.text = element_text(color='#2b2005'),
+                   legend.title = element_text(color = '#2b2005'),
+                   plot.title = element_text(color = '#2b2005', size = 22),
+                   panel.grid = element_blank())
+```
+</div>
+<br>
+
+# POISSON REGRESSION
+
+The histogram depicting the distribution of overdose occurrences in 2017 in figure 7 tell us how heavily skewed towards 0 our data is. This is understandable -- as the vast majority of our fishnet cells will have no overdose occurances within them. We use a Poisson Regression because a Poisson distribution most similarly resembles our overdose distribution. 
+
+<br>
 <div class="plot">
 ```{r hist1, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10}
 
@@ -929,7 +948,6 @@ final_net %>%
 </div>
 <br>
 
-# POISSON REGRESSION
 ```{r reg, results='hide', echo=FALSE, message=FALSE, warning=FALSE}
 ## define the variables we want
 
@@ -1008,7 +1026,12 @@ error_by_reg_and_fold <-
 
 ```
 
+The variables we choose to use in our regression are as follows: 
+`Commercial`, `High.Density.Residential`, `Low.Density.Residential`, `Downtown`, `Park.nn`, `Arts.and.Education.nn`, `Police.Fire.nn`, `Public.Housing`, `Vacant.Property`, `Low.Income`, `Low.Rent`, `Majority.White`, `Majority.Hispanic`,`Child.Crisis.Center`, `Industrial`, `misdemeanor`, `felony`,`lightrail`, `overdose.isSig.dist`, `overdose.isSig`
+
 ### CROSS VALIDATION
+
+
 <div class="plot">
 ```{r hist2, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10}
 
