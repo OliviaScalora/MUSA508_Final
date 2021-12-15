@@ -142,14 +142,14 @@ We believe in the power of predictive modeling to assist in the critical decisio
 ### WRANGLING DATA
 
 Our data sets include:  
-- **Fire and Medical Opioid Overdose Incidents** Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.  
-- **Census ACS data** demographic and socio-economic indicators at the block group level.  
-- **City Property Data** will be filtered to account for various facility type - child crisis center, fire and police station, public housing, arts and education centers  
-- **Crime Data** Incidents based on initial police reports taken by officers when responding to calls for service. Data is modified for public use. Address and Location are not exact locations of incidents and have been rounded to nearest hundred block. Lat/Long are approximations only based on rounded hundred block. Incidents reported in this dataset may not correlate with 911 Events datasets and calls for Police service. The City of Mesa does not disclose information that is inflammatory in nature that impacts our citizens. Split by type; misdemeanors and felonies.  
-- **Park Locations And Amenities** Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.  
-- **Light Rail Stations** This dataset provides information regarding the location of current light rail stations within the City of Mesa and each station’s name and address.
-- **City Boundary Map** Perimeter of the city boundary.    
-- **Zoning Districs** Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land - separated between High density residential, low density residential, downtown, commercial, and industrial.   
+* **Fire and Medical Opioid Overdose Incidents** Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.  
+* **Census ACS data** demographic and socio-economic indicators at the block group level.  
+* **City Property Data** will be filtered to account for various facility type - child crisis center, fire and police station, public housing, arts and education centers  
+* **Crime Data** Incidents based on initial police reports taken by officers when responding to calls for service. Data is modified for public use. Address and Location are not exact locations of incidents and have been rounded to nearest hundred block. Lat/Long are approximations only based on rounded hundred block. Incidents reported in this dataset may not correlate with 911 Events datasets and calls for Police service. The City of Mesa does not disclose information that is inflammatory in nature that impacts our citizens. Split by type; misdemeanors and felonies.  
+* **Park Locations And Amenities** Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.  
+* **Light Rail Stations** This dataset provides information regarding the location of current light rail stations within the City of Mesa and each station’s name and address.
+* **City Boundary Map** Perimeter of the city boundary.    
+* **Zoning Districs** Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land - separated between High density residential, low density residential, downtown, commercial, and industrial.   
 
 <br>
 
@@ -440,8 +440,11 @@ ggplot()+
 
 <br> <br>  
 
-figure 2. illustrates the relationship of zoning districts to the opioid overdose incident points. Because the overdose incident points are rounded to the approximate 1/3 mi. interval for privacy reasons, we have aggregated the amount of overdoses at each point and visualized each point as a graduated symbol representing the count number. This is how overdose incident points will be illustrated throughout most of the analysis.
+figure 2. illustrates the relationship of zoning districts to the opioid overdose incident points. Because the overdose incident points are rounded to the approximate 1/3 mi. interval for privacy reasons, we have aggregated the amount of overdoses at each point and visualized each point as a graduated symbol representing the count number. This is how overdose incident points will be illustrated throughout the analysis, with the exception of othe fishnet.
 <br>  
+
+### FISHNET   
+
 A municipal or government boundary, be it a Census block group, or a police district, is often drawn arbitrarily or does not represent a consistent division of space. We are hoping to analyze the risk of opioid overdose evenly across space and cannot be limited by these boundaries. For this reason, we create a 'fishnet', or grid of cells at 1/3 mi dimensions, to which we will aggregate our point data. The risk predictions will be represented as a smooth surface. Figure 3 illustrates opioid overdose incidents from 2017, where darker pixels indicate a higher count of incidents.
 
 figures 4.1 - 4.4 follow the same process, but with our independent variables wrangled from our data sets.
@@ -869,7 +872,7 @@ ggplot() +
 </div>
 <br>
 
-### CORRELATION   
+### VARIABLE CORRELATION   
   
 For the final step of our exploratory analysis, we plot the Pearson correlation of each independent variable and our dependent variable. If the Pearson coefficient (the r value displayed in the top left corner of each individual scatter plot) is close to 1, we have a strong positive correlation. Similarly, if the r value is close to -1, we have a strong negative correlation. The closer the r value is to 0, the weaker the correlation between our variables. While we can see there is no strong positive or negative correlation between any predictor and the dependent variable, this step helps us to determine which variables should be used in our regression model. For example, we see `Low.Income` has a positive correlation of 0.33, while the nearest neighbor version of this variable, `low_inc.nn` has an almost equal negative correlation of -0.24. We choose `Low.Income` to use in our model because change in demographic indicators such as income levels or race is not consistent with distance. Proximity does not account for "the other side of the tracks" phenomenon where social and economic status is contained within a geographic boundary. And we know low income neighborhoods often face more drug related issues, so we expect a positive correlation. 
 
@@ -905,8 +908,8 @@ ggplot(correlation.long, aes(Value, countoverdose)) +
 ```
 </div>
 <br>
-<div class="map" style="object-fit: cover; border: 10px solid #f0efeb;">
-```{r corr.plot1, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10.1, fig.height =9.35}
+<div class="map" style="object-fit: cover; border: 10px solid #f0efeb">
+```{r corr.plot1, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10.05, fig.height =9.38, strip.white=TRUE}
 numericVars <-
   select_if(st_drop_geometry(final_net), is.numeric) %>% na.omit()
 
@@ -923,17 +926,17 @@ ggcorrplot(
                    legend.text = element_text(color='#2b2005'),
                    legend.title = element_text(color = '#2b2005'),
                    plot.title = element_text(color = '#2b2005', size = 22),
-                   panel.grid = element_blank())
+                   panel.grid = element_blank(),
+                   plot.margin= margin(2,2,2,2, unit = 'cm'))
 ```
 </div>
 <br>
 
 # POISSON REGRESSION
 
-The histogram depicting the distribution of overdose occurrences in 2017 in figure 7 tell us how heavily skewed towards 0 our data is. This is understandable -- as the vast majority of our fishnet cells will have no overdose occurances within them. We use a Poisson Regression because a Poisson distribution most similarly resembles our overdose distribution. 
+The histogram depicting the distribution of overdose occurrences in 2017 in figure 7 tell us how heavily skewed towards 0 our data is. This is understandable -- as the vast majority of our fishnet cells will have no overdose occurrences within them. The Poisson distribution most similarly resembles our overdose distribution. 
 
 <br>
-<div class="plot">
 ```{r hist1, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10}
 
 final_net %>%
@@ -943,9 +946,15 @@ final_net %>%
   scale_y_continuous(breaks = seq(0,1500, by = 200))+
   labs(title="Distribution of Overdose Occurances", subtitle = "Mesa, AZ",
        x="Overdose Occurance Count", y="Frequency", 
-       caption = "figure 7.") +plotTheme()
+       caption = "figure 7.") +plotTheme()+theme(panel.background = element_rect(fill = "#f0efeb", color = "#f0efeb"),
+                   legend.background = element_rect(fill="#f0efeb", color = "#f0efeb"),
+                   plot.background = element_rect(fill = "#f0efeb", color = "#f0efeb"),
+                   panel.border = element_blank(),
+                   legend.text = element_text(color='#2b2005'),
+                   legend.title = element_text(color = '#2b2005'),
+                   plot.title = element_text(color = '#2b2005', size = 22),
+                   panel.grid = element_blank())
 ```
-</div>
 <br>
 
 ```{r reg, results='hide', echo=FALSE, message=FALSE, warning=FALSE}
@@ -1026,11 +1035,24 @@ error_by_reg_and_fold <-
 
 ```
 
-The variables we choose to use in our regression are as follows: 
+**The variables we choose to use in our regression are as follows:**
+<br>
+<div class="plot">
 `Commercial`, `High.Density.Residential`, `Low.Density.Residential`, `Downtown`, `Park.nn`, `Arts.and.Education.nn`, `Police.Fire.nn`, `Public.Housing`, `Vacant.Property`, `Low.Income`, `Low.Rent`, `Majority.White`, `Majority.Hispanic`,`Child.Crisis.Center`, `Industrial`, `misdemeanor`, `felony`,`lightrail`, `overdose.isSig.dist`, `overdose.isSig`
+</div>
+
 
 ### CROSS VALIDATION
 
+While an accurate model is very important, we are more concerned with generalizability for the geospatial risk model. This will tell us how well our model performs on seeing new data and its ability to recognize spatial group contexts, like demographic and racial differences across neighborhoods. Our methods for cross-validating our data include k-fold cross validation(CV) and leave one group out (LOGO-CV). K-fold takes a  We also want to see how each cross validation method performs with and without spatial context by including our Moran's I significance indicator.
+
+Therefor, we are running four iterations of our cross validation:  
+1. K-fold CV - Just risk factors
+2. K-fold CV - Spatial Process
+3. LOGO-CV - Just risk factors
+4. LOGO-CV - Spatial Process 
+
+The hope here is to confirm that the inclusion of the spatial process is improving our model. Figures 8 and 9 visualize the mean average errors made by our model. 
 
 <div class="plot">
 ```{r hist2, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10}
@@ -1045,10 +1067,9 @@ error_by_reg_and_fold %>% ggplot(aes(MAE))+
                     strip.background = element_rect(fill= '#f0efeb', color=NA))
 
 ```
-</div>
+
 <br>
 
-<div class="plot">
 ```{r err.space, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =8}
 #-----SPATIAL PLOTS-----
 
@@ -1145,10 +1166,9 @@ grid.arrange(
                                                       legend.key.size = unit(.5, 'cm')), nrow=1)
 
 ```
-</div>
+
 <br>
 
-<div class="plot">
 ```{r pred.obv, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =6}
 st_drop_geometry(reg.summary) %>%
   group_by(Regression) %>%
@@ -1272,10 +1292,7 @@ grid.arrange(p3 + theme(legend.position="none"),
   
 
 ```
-</div>
 <br>
-
-<div class="plot">
 ```{r kd.plot18, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =6}
 
 # In this section, we ask whether risk predictions outperform traditional ‘Kernel density’ hotspot mapping. 
@@ -1377,6 +1394,8 @@ rbind(opioid_KDE_sf , opioid_risk_sf) %>%
 <br>
 
 # CONCLUSION 
+
+Our model is performing well with a relatively low median average error, but of course there is always opportunity to improve our analysis. 
 
 
 ### REFERENCES
