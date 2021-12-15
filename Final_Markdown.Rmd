@@ -134,7 +134,14 @@ figure 1.
 
 We believe in the power of predictive modeling to assist in the critical decision making process around the allocation of resources towards the opioid crisis. The goal of this analysis is to estimate a geospatial risk prediction model, predicting overdoses as a function of environmental factors like crime, proximity to city facilities & services, and demographic indicators. The process includes wrangling data from [Mesa's Open Data portal](https://data.mesaaz.gov/), and engineering them into powerful predictive features. We use a Poisson Regression, cross validated with K-fold and Leave One Group Out (LOGO) cross validation methods. We are essentially borrowing the experience of observed opioid overdose incidents of 2017, and will test our predictions with observed opioid overdose incidents from 2018. Predictions from this models are interpreted as ‘the forecasted risk/opportunity of that event occurring here'. A series of 'goodness of fit' indicators will tell us how well our model is performing, and if our predictions will generalize well across time and space. The process includes wrangling data from Mesa's Open Data portal as well as the US Census, and engineering variables into powerful predictive features.
 
-**Our end goal with the geospatisl risk model is to produce a tool that can be used by Mesa health officials to implement harm reduction strategies through proactive resource allocation.**
+Our end goal with the geospatial risk model is to produce a tool that can be used by Mesa health officials to implement harm reduction strategies through proactive resource allocation. We've conceptualized a program that will create facilities throughout Mesa, called Opioid Observation and Treatment Centers (OOTC). An OOTC will serve two purposes:
+
+- Be a safe space that provides support, safe - monitoring/safe injection site, overdose treatment, and primary care for individuals who are using and would otherwise be on the street.
+
+- Have staff and resources prepared for emergency response to overdose incidents -- cater to public and residential overdoses.
+
+Through this analysis, we hope to identify locations throughout Mesa that will benefit most from the creation of Opioid Observation and Treatment Centers, and provide recommendations for future intervention. City and healthcare officials can properly allocate staff and resources to creating these centers with the goal of mitigating opioid overdose death.
+
 <br> 
 
 # EXPLORATORY ANALYSIS 
@@ -142,14 +149,14 @@ We believe in the power of predictive modeling to assist in the critical decisio
 ### WRANGLING DATA
 
 Our data sets include:  
-* **Fire and Medical Opioid Overdose Incidents** Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.  
-* **Census ACS data** demographic and socio-economic indicators at the block group level.  
-* **City Property Data** will be filtered to account for various facility type - child crisis center, fire and police station, public housing, arts and education centers  
-* **Crime Data** Incidents based on initial police reports taken by officers when responding to calls for service. Data is modified for public use. Address and Location are not exact locations of incidents and have been rounded to nearest hundred block. Lat/Long are approximations only based on rounded hundred block. Incidents reported in this dataset may not correlate with 911 Events datasets and calls for Police service. The City of Mesa does not disclose information that is inflammatory in nature that impacts our citizens. Split by type; misdemeanors and felonies.  
-* **Park Locations And Amenities** Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.  
-* **Light Rail Stations** This dataset provides information regarding the location of current light rail stations within the City of Mesa and each station’s name and address.
-* **City Boundary Map** Perimeter of the city boundary.    
-* **Zoning Districs** Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land - separated between High density residential, low density residential, downtown, commercial, and industrial.   
+- **Fire and Medical Opioid Overdose Incidents** Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.
+- **Census ACS data** demographic and socio-economic indicators at the block group level.  
+- **City Property Data** will be filtered to account for various facility type - child crisis center, fire and police station, public housing, arts and education centers  
+- **Crime Data** Incidents based on initial police reports taken by officers when responding to calls for service. Data is modified for public use. Address and Location are not exact locations of incidents and have been rounded to nearest hundred block. Lat/Long are approximations only based on rounded hundred block. Incidents reported in this dataset may not correlate with 911 Events datasets and calls for Police service. The City of Mesa does not disclose information that is inflammatory in nature that impacts our citizens. Split by type; misdemeanors and felonies.  
+- **Park Locations And Amenities** Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.  
+- **Light Rail Stations** This dataset provides information regarding the location of current light rail stations within the City of Mesa and each station’s name and address.
+- **City Boundary Map** Perimeter of the city boundary.    
+- **Zoning Districs** Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land - separated between High density residential, low density residential, downtown, commercial, and industrial.   
 
 <br>
 
@@ -927,7 +934,7 @@ ggcorrplot(
                    legend.title = element_text(color = '#2b2005'),
                    plot.title = element_text(color = '#2b2005', size = 22),
                    panel.grid = element_blank(),
-                   plot.margin= margin(2,2,2,2, unit = 'cm'))
+                   plot.margin= margin(1,1,1,1, unit = 'cm'))
 ```
 </div>
 <br>
@@ -1037,22 +1044,21 @@ error_by_reg_and_fold <-
 
 **The variables we choose to use in our regression are as follows:**
 <br>
-<div class="plot">
+
 `Commercial`, `High.Density.Residential`, `Low.Density.Residential`, `Downtown`, `Park.nn`, `Arts.and.Education.nn`, `Police.Fire.nn`, `Public.Housing`, `Vacant.Property`, `Low.Income`, `Low.Rent`, `Majority.White`, `Majority.Hispanic`,`Child.Crisis.Center`, `Industrial`, `misdemeanor`, `felony`,`lightrail`, `overdose.isSig.dist`, `overdose.isSig`
-</div>
 
 
+<br>
 ### CROSS VALIDATION
 
-While an accurate model is very important, we are more concerned with generalizability for the geospatial risk model. This will tell us how well our model performs on seeing new data and its ability to recognize spatial group contexts, like demographic and racial differences across neighborhoods. Our methods for cross-validating our data include k-fold cross validation(CV) and leave one group out (LOGO-CV). K-fold takes a  We also want to see how each cross validation method performs with and without spatial context by including our Moran's I significance indicator.
+While an accurate model is very important, we are more concerned with generalizability for the geospatial risk model. This will tell us how well our model performs on seeing new data and its ability to recognize spatial group contexts, like demographic and racial differences across neighborhoods. Our methods for cross-validating our data include k-fold cross validation(CV) and leave one group out cross validation (LOGO-CV). K-fold takes a group of our fishnet cells, trains our model on the remaining cells, tests the prediction on said group, records a goodness of fit metric, and moves onto the next group of cells until every cell has been trained and tested on. LOGO-CV has a similar process, except we are using the Census Tract `GEOID` as the geographic area we exclude and test on. LOGO-CV should ideally use neighborhood geographic boundaries because Census Tracts are often arbitrary, but we were limited by the data available to us. We are also looking to see how each cross validation method performs with and without spatial context by including our Moran's I significance indicator. Therefore, we are running four iterations of our cross validation:   
+  
+**1. K-fold CV - Just risk factors**  
+**2. K-fold CV - Spatial Process**  
+**3. LOGO-CV - Just risk factors**  
+**4. LOGO-CV - Spatial Process**   
 
-Therefor, we are running four iterations of our cross validation:  
-1. K-fold CV - Just risk factors
-2. K-fold CV - Spatial Process
-3. LOGO-CV - Just risk factors
-4. LOGO-CV - Spatial Process 
-
-The hope here is to confirm that the inclusion of the spatial process is improving our model. Figures 8 and 9 visualize the mean average errors made by our model. 
+The hope here is to confirm that the inclusion of the spatial process is improving our model. Figures 8 and 9 visualize the mean absolute errors (MAE) made by our model. This histograms in figure 8 are showing us the distribution of the MAE for each fold made by each regression iteration. And as we can see in the MAE table for each regression below, our average error, while marginal, decreases for our LOGO-CV when the spatial process is accounted for, confirming our expectation. 
 
 <div class="plot">
 ```{r hist2, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10}
@@ -1085,6 +1091,8 @@ ggplot() +
 </div>
 <br>
 
+
+<br>
 ```{r Cv.table, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =4}
 st_drop_geometry(error_by_reg_and_fold) %>%
   group_by(Regression) %>% 
