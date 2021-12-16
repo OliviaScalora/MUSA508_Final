@@ -1287,30 +1287,6 @@ ggplot() +
   labs(title = 'Absolute Errors', subtitle='Spatial LOGO-CV: Spatial Process') +
   mapTheme()+theme(panel.border=element_blank(),legend.position = "bottom",legend.key.size = unit(.5, 'cm')), nrow=1)
 
-ggmap(mesa_base)+ geom_sf(data = reg.ss.spatialCV, aes(fill = Prediction, colour = Prediction))
-
-myMap <- get_stamenmap(bbox = c(left = -111.833267,
-                                bottom = 29.424564,
-                                right = -117.833267,
-                                top = 36.424564),
-                       maptype = "toner", 
-                       crop = FALSE,
-                       zoom = 7)
-
-plot(myMap)
-basemap_ggplot(
-  ext = NULL,
-  map_service = NULL,
-  map_type = NULL,
-  map_res = NULL,
-  map_token = NULL,
-  map_dir = NULL,
-  force = NULL,
-  ...,
-  verbose = TRUE
-)
-
-
 
 
 #join downtown and commercial zoning districts
@@ -1328,23 +1304,21 @@ reg.ss.spatialCV%>%
 
 OOTC.site<- st_join(site, reg.ss.spatialCV, join=st_intersects)%>%filter(Prediction > 1)
 
+st_write(OOTC.site, paste0('C:/Users/oscal/Documents/UpennMUSA/Semester_1/Public Policy Lab', "/", "OOTC.site.shp"))
+st_write(city_boundary, paste0('C:/Users/oscal/Documents/UpennMUSA/Semester_1/Public Policy Lab', "/", "city_boundary.shp"))
+st_write(reg.ss.spatialCV, paste0('C:/Users/oscal/Documents/UpennMUSA/Semester_1/Public Policy Lab', "/", "pred.shp"))
+
+
+
 ggplot() +
+  geom_sf(data= zoning,
+          fill= 'grey90',
+          color = NA,)+
+  geom_sf(data =city_boundary, fill = NA, color ='black')+
+  geom_sf(data = mesa_tracts17, fill = NA, color ='grey75', size = .25)+
   geom_sf(data=OOTC.site, aes(fill = Prediction), color =NA)+
   scale_fill_viridis(option = "F", direction = -1) +
   mapTheme()
-
-map <- get_googlemap('mesa arizona', zoom = 13, size = c(900, 900), maptype= 'satellite')
-plot(map)
-
-mesa_base<-get_map(location = 'mesa arizona', zoom = 11, maptype = "toner",  legend = "bottomleft")
-plot(mesa_base)
-
-mesa_base2<- qmap(location = 'mesa arizona', zoom = 11, maptype = "toner",  legend = "bottomleft")
-plot(mesa_base2)
-
-mesa_base + geom_polygon(aes(x=long, y=lat, group=group), fill='grey', size=.2,color='green', data=OOTC.site)
-library(rgdal)
-OOTC.site <- spTransform(OOTC.site, CRS("+proj=longlat +datum=WGS84"))
 
 
 
@@ -1528,7 +1502,7 @@ rbind(opioid_KDE_sf , opioid_risk_sf) %>%
   ggplot(aes(Risk_Category,Rate_of_test_set_overdose)) +
   geom_bar(aes(fill=label), position="dodge", stat="identity") +
   scale_fill_manual(values=c("#4281a4", "#fe938c"))+
-  labs(title = "Risk prediction vs. Kernel density, 2018 burglaries") +
+  labs(title = "Risk prediction vs. Kernel density, 2018 overdoses") +
   plotTheme() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
 
 #uh oh... model is not performing well. higher kernel density in the highest risk category is not what we want
