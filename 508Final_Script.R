@@ -1006,6 +1006,7 @@ ggplot() +
 #----CORRELATION PLOTS----
 
 install.packages("ggcorrplot")
+library(ggcorrplot)
 numericVars <-
   select_if(st_drop_geometry(final_net), is.numeric) %>% na.omit()
 
