@@ -35,6 +35,8 @@ library(RgoogleMaps)
 library(rstudioapi)
 library(ggpubr)
 library(prettydoc)
+library(ggplot2)
+
 
 options(scipen=999)
 options(tigris_class = "sf")
@@ -1003,11 +1005,52 @@ ggplot() +
 
 #----CORRELATION PLOTS----
 
+install.packages("ggcorrplot")
+numericVars <-
+  select_if(st_drop_geometry(final_net), is.numeric) %>% na.omit()
+
+ggcorrplot(
+  round(cor(numericVars), 1),
+  p.mat = cor_pmat(numericVars),
+  colors = c("#4281a4", "#f0efeb", "#db534b"),
+  type="lower",
+  insig = "blank") +
+  labs(title = "Correlation across numeric variables")
+
+
+
 #### for counts
 correlation.long <-
   st_drop_geometry(final_net) %>%
   dplyr::select(-uniqueID, -cvID, -GEOID) %>%
   gather(Variable, Value, -countoverdose)
+
+final_net.2<- final_net %>% dplyr::select(Downtown, Commercial, felony, misdemeanor, Police.Fire.Station,
+                                          Police.Fire.nn, High.Density.Residential, Low.Density.Residential, Low.Rent, Low.Income,
+                                          Majority.White, Majority.Hispanic, uniqueID,cvID,GEOID,countoverdose)
+
+
+correlation.long.2 <-
+  st_drop_geometry(final_net.2) %>%
+  dplyr::select(-uniqueID, -cvID, -GEOID) %>%
+  gather(Variable, Value, -countoverdose)
+
+##### for nn
+correlation.cor.2 <-
+  correlation.long.2 %>%
+  group_by(Variable) %>%
+  summarize(correlation = cor(Value, countoverdose, use = "complete.obs"))
+
+ggplot(correlation.long.2, aes(Value, countoverdose)) +
+  geom_point(size = 1, color = '#223843') +
+  geom_text(data = correlation.cor.2, aes(label = paste("r =", round(correlation, 2))),
+            x=-Inf, y=Inf, vjust = 1.5, hjust = -.1) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  facet_wrap(~Variable, ncol = 4, scales = "free") +
+  labs(title = "Narcotics Incidents count as a function of risk factors",
+       caption = "fig 5") +
+  plotTheme()
+
 
 ##### for nn
 correlation.cor <-
@@ -1219,6 +1262,89 @@ st_drop_geometry(reg.summary) %>%
   facet_wrap(~Regression) + xlim(0,10) +
   labs(title = "Predicted and observed burglary by observed burglary decile")  +
   plotTheme()
+
+
+# JOIN PREDICTIONS TO ZONE TYPE
+
+reg.summary.logo<-reg.summary%>% filter(Regression == "Spatial LOGO-CV: Spatial Process")%>%
+  mutate(abs_Error = abs(Error))
+
+grid.arrange(
+#LOGO CV Spatial Predictions
+reg.ss.spatialCV%>%
+  ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1)+
+  labs(title='Predictions',subtitle='Spatial LOGO-CV: Spatial Process')+
+  mapTheme()+theme(panel.border=element_blank(),legend.position = "bottom",legend.key.size = unit(.5, 'cm')),
+
+#LOGO CV Spatial Errors
+ggplot() +
+  geom_sf(data = reg.summary.logo, aes(fill = abs_Error, colour = abs_Error)) +
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1) +
+  labs(title = 'Absolute Errors', subtitle='Spatial LOGO-CV: Spatial Process') +
+  mapTheme()+theme(panel.border=element_blank(),legend.position = "bottom",legend.key.size = unit(.5, 'cm')), nrow=1)
+
+ggmap(mesa_base)+ geom_sf(data = reg.ss.spatialCV, aes(fill = Prediction, colour = Prediction))
+
+myMap <- get_stamenmap(bbox = c(left = -111.833267,
+                                bottom = 29.424564,
+                                right = -117.833267,
+                                top = 36.424564),
+                       maptype = "toner", 
+                       crop = FALSE,
+                       zoom = 7)
+
+plot(myMap)
+basemap_ggplot(
+  ext = NULL,
+  map_service = NULL,
+  map_type = NULL,
+  map_res = NULL,
+  map_token = NULL,
+  map_dir = NULL,
+  force = NULL,
+  ...,
+  verbose = TRUE
+)
+
+
+
+
+#join downtown and commercial zoning districts
+
+site<- rbind(Commercial, Downtown)
+reg.ss.spatialCV%>%
+  ggplot() +
+  geom_sf(data=site, fill=NA, color = 'black', size = .5, alpha = .5)+ 
+  geom_sf(aes(fill = Prediction, colour = Prediction), alpha=.5)+
+  geom_sf(data=city_boundary, fill = NA)+
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1)+
+  labs(title='Predictions',subtitle='Spatial LOGO-CV: Spatial Process')+
+  mapTheme()+theme(panel.border=element_blank(),legend.position = "bottom",legend.key.size = unit(.5, 'cm'))
+
+OOTC.site<- st_join(site, reg.ss.spatialCV, join=st_intersects)%>%filter(Prediction > 1)
+
+ggplot() +
+  geom_sf(data=OOTC.site, aes(fill = Prediction), color =NA)+
+  scale_fill_viridis(option = "F", direction = -1) +
+  mapTheme()
+
+map <- get_googlemap('mesa arizona', zoom = 13, size = c(900, 900), maptype= 'satellite')
+plot(map)
+
+mesa_base<-get_map(location = 'mesa arizona', zoom = 11, maptype = "toner",  legend = "bottomleft")
+plot(mesa_base)
+
+mesa_base2<- qmap(location = 'mesa arizona', zoom = 11, maptype = "toner",  legend = "bottomleft")
+plot(mesa_base2)
+
+mesa_base + geom_polygon(aes(x=long, y=lat, group=group), fill='grey', size=.2,color='green', data=OOTC.site)
+library(rgdal)
+OOTC.site <- spTransform(OOTC.site, CRS("+proj=longlat +datum=WGS84"))
+
 
 
 #Test  generalizability across neighborhood

@@ -113,7 +113,7 @@ g_legend<-function(a.gplot){
 
 ```
 
-# INTRODUCTION
+# **INTRODUCTION**
 
 The opioid crisis in Mesa, Arizona is a public health emergency that must be addressed. A spike in overdoses onset by the COVID-19 pandemic in early 2020 saw an increase of 76% in the number of opioid overdose incidents and a 132% increase in opioid related deaths^1^. The problem is not a new one, however. Due to an alarming increase in opioid deaths in 2016, Governor Ducey declared a state of emergency on June 5, 2017 and the Mesa County Opioid Response Group was established in June 2018 to reduce the community impact of opioids through prevention, treatment, and recovery services.
 The goal of the group is to prevent substance misuse through:   
@@ -132,31 +132,41 @@ figure 1.
 </div>
 <br>
 
-We believe in the power of predictive modeling to assist in the critical decision making process around the allocation of resources towards the opioid crisis. The goal of this analysis is to estimate a geospatial risk prediction model, predicting overdoses as a function of environmental factors like crime, proximity to city facilities & services, and demographic indicators. The process includes wrangling data from [Mesa's Open Data portal](https://data.mesaaz.gov/), and engineering them into powerful predictive features. We use a Poisson Regression, cross validated with K-fold and Leave One Group Out (LOGO) cross validation methods. We are essentially borrowing the experience of observed opioid overdose incidents of 2017, and will test our predictions with observed opioid overdose incidents from 2018. Predictions from this models are interpreted as ‘the forecasted risk/opportunity of that event occurring here'. A series of 'goodness of fit' indicators will tell us how well our model is performing, and if our predictions will generalize well across time and space. The process includes wrangling data from Mesa's Open Data portal as well as the US Census, and engineering variables into powerful predictive features.
+We believe in the power of predictive modeling to assist in the critical decision making process around the allocation of resources towards the opioid crisis. The goal of this analysis is to estimate a geospatial risk prediction model, predicting overdoses as a function of environmental factors like crime, proximity to city facilities & services, and demographic indicators. The process includes wrangling data from [Mesa's Open Data portal](https://data.mesaaz.gov/), and engineering them into powerful predictive features. We use a Poisson Regression, cross validated with K-fold and Leave One Group Out (LOGO) cross validation methods. We are essentially borrowing the experience of observed opioid overdose incidents of 2017, and will compare our predictions to observed opioid overdose incidents from 2018. Predictions from this models are interpreted as ‘the forecasted risk/opportunity of that event occurring here'. A series of 'goodness of fit' indicators will tell us how well our model is performing, and if our predictions will generalize well across time and space. 
 
-Our end goal with the geospatial risk model is to produce a tool that can be used by Mesa health officials to implement harm reduction strategies through proactive resource allocation. We've conceptualized a program that will create facilities throughout Mesa, called Opioid Observation and Treatment Centers (OOTC). An OOTC will serve two purposes:
+## Opioid Observation Treatment Center
+
+Our end goal with the geospatial risk model is to produce a tool that can be used by Mesa health officials to implement harm reduction strategies through proactive resource allocation. We propose an updated response program that will create facilities throughout Mesa called Opioid Observation and Treatment Centers (OOTC). An OOTC will serve two purposes:
 
 - Be a safe space that provides support, safe - monitoring/safe injection site, overdose treatment, and primary care for individuals who are using and would otherwise be on the street.
 
 - Have staff and resources prepared for emergency response to overdose incidents -- cater to public and residential overdoses.
 
-Through this analysis, we hope to identify locations throughout Mesa that will benefit most from the creation of Opioid Observation and Treatment Centers, and provide recommendations for future intervention. City and healthcare officials can properly allocate staff and resources to creating these centers with the goal of mitigating opioid overdose death.
+## Web Application
 
+Through this analysis, we hope to identify locations throughout Mesa that will benefit most from the creation of Opioid Observation and Treatment Centers, and provide recommendations for future intervention. We have conceptualized a web application that will give access to the automatically updating output of our machine learning model. City and healthcare officials can utilize our analysis output to properly allocate staff and resources towards creating these centers with the goal of mitigating opioid overdose death. 
 <br> 
 
-# EXPLORATORY ANALYSIS 
+<div class="plot">
 
-### WRANGLING DATA
+![WebApp Wireframe](Graphics/Wireframe.png)
+
+</div>
+<br> 
+
+# **EXPLORATORY ANALYSIS**
+
+## Wrangling Data
 
 Our data sets include:  
-- **Fire and Medical Opioid Overdose Incidents** Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.
-- **Census ACS data** demographic and socio-economic indicators at the block group level.  
-- **City Property Data** will be filtered to account for various facility type - child crisis center, fire and police station, public housing, arts and education centers  
-- **Crime Data** Incidents based on initial police reports taken by officers when responding to calls for service. Data is modified for public use. Address and Location are not exact locations of incidents and have been rounded to nearest hundred block. Lat/Long are approximations only based on rounded hundred block. Incidents reported in this dataset may not correlate with 911 Events datasets and calls for Police service. The City of Mesa does not disclose information that is inflammatory in nature that impacts our citizens. Split by type; misdemeanors and felonies.  
-- **Park Locations And Amenities** Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.  
-- **Light Rail Stations** This dataset provides information regarding the location of current light rail stations within the City of Mesa and each station’s name and address.
-- **City Boundary Map** Perimeter of the city boundary.    
-- **Zoning Districs** Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land - separated between High density residential, low density residential, downtown, commercial, and industrial.   
+- [**Fire and Medical Opioid Overdose Incidents**](https://data.mesaaz.gov/Fire-and-Medical/Fire-and-Medical-Opioid-Overdose-Incidents/qufy-tzv6) Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.  
+- [**Census ACS data**](https://www.census.gov/programs-surveys/acs) demographic and socio-economic indicators at the block group level.     
+- [**City Property Data**](https://data.mesaaz.gov/Zoning-Property/City-Owned-Property/xms2-ya86) will be filtered to account for various facility type - child crisis center, fire and police station, public housing, arts and education centers.    
+- [**Crime Data**](https://data.mesaaz.gov/Police/Police-Incidents/39rt-2rfj) Incidents based on initial police reports taken by officers when responding to calls for service. Data is modified for public use. Address and Location are not exact locations of incidents and have been rounded to nearest hundred block. Lat/Long are approximations only based on rounded hundred block. Incidents reported in this dataset may not correlate with 911 Events datasets and calls for Police service. The City of Mesa does not disclose information that is inflammatory in nature that impacts our citizens. Split by type; misdemeanors and felonies.  
+ [**Park Locations And Amenities**](https://data.mesaaz.gov/Parks-Recreation-and-Community-Facilities/Parks-Locations-And-Amenities/djym-pkpp) Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.  
+- [**Light Rail Stations**](https://opengis.mesaaz.gov/datasets/7c6b201d9e38451185032fec51acfaa4_0/explore) This dataset provides information regarding the location of current light rail stations within the City of Mesa and each station’s name and address.   
+- [**City Boundary Map**](https://data.mesaaz.gov/Zoning-Property/City-Boundary-Map/wf8n-kwgk) Perimeter of the city boundary.     
+[**Zoning Districs**](https://data.mesaaz.gov/Zoning-Property/Zoning-Districts/qscf-6ebm) Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land - separated between High density residential, low density residential, downtown, commercial, and industrial.   
 
 <br>
 
@@ -450,7 +460,7 @@ ggplot()+
 figure 2. illustrates the relationship of zoning districts to the opioid overdose incident points. Because the overdose incident points are rounded to the approximate 1/3 mi. interval for privacy reasons, we have aggregated the amount of overdoses at each point and visualized each point as a graduated symbol representing the count number. This is how overdose incident points will be illustrated throughout the analysis, with the exception of othe fishnet.
 <br>  
 
-### FISHNET   
+## The Fishnet  
 
 A municipal or government boundary, be it a Census block group, or a police district, is often drawn arbitrarily or does not represent a consistent division of space. We are hoping to analyze the risk of opioid overdose evenly across space and cannot be limited by these boundaries. For this reason, we create a 'fishnet', or grid of cells at 1/3 mi dimensions, to which we will aggregate our point data. The risk predictions will be represented as a smooth surface. Figure 3 illustrates opioid overdose incidents from 2017, where darker pixels indicate a higher count of incidents.
 
@@ -679,8 +689,7 @@ do.call(grid.arrange,c(census_mapList, ncol=2, top="figure 4.4: Census Variable 
 </div>
 <br>  
 
-
-### NEAREST NEIGHBOR    
+## Nearest Neighbor    
   
 Figures 4.5 and 4.6 are a representation of the nearest neighbor function used on our City property and census data.  The nearest neighbor function calculates the average distance of each fishnet cell to the closest 3 points of the variable. this creates a gradiated map because the value of each fishnet cell takes on the calculated average distance. We will determine whether we will use the unaggregated or nearest neighbor version of these variables for the final poisson regression through analyzing the correlation of each independent variable to the dependent variable later in the analysis. Our next step is to explore the spatial process of opioid overdoses in Mesa.    
 
@@ -852,7 +861,7 @@ final_net.long <-
 <br>
 
 
-### LOCAL MORAN'S I     
+## Local Moran's I    
   
 To test the spatial process, we us a statistic called Local Moran’s I. Here, the null hypothesis is that the overdose count at a given location is randomly distributed relative to its immediate neighbors. We create a neighbor list and a spatial weights index using *queen contiguity.*  Our output, figure 5.1, depicts where there is relatively high local clustering of overdose incidents. We see this clustering also represented in the spatial process of the p-value, where lighter pixel colors represent a lower p-value. If our null hypothesis states that there is no significant local clustering, a p-value <= 0.05 indicates the areas in which we can reject the null hypothesis in favor of the alternative hypothesis, that there is in fact local clustering. The significant hot spots are created from the fishnet pixels that have a p-value <= 0.05. 
 
@@ -879,7 +888,7 @@ ggplot() +
 </div>
 <br>
 
-### VARIABLE CORRELATION   
+## Variable Correlation   
   
 For the final step of our exploratory analysis, we plot the Pearson correlation of each independent variable and our dependent variable. If the Pearson coefficient (the r value displayed in the top left corner of each individual scatter plot) is close to 1, we have a strong positive correlation. Similarly, if the r value is close to -1, we have a strong negative correlation. The closer the r value is to 0, the weaker the correlation between our variables. While we can see there is no strong positive or negative correlation between any predictor and the dependent variable, this step helps us to determine which variables should be used in our regression model. For example, we see `Low.Income` has a positive correlation of 0.33, while the nearest neighbor version of this variable, `low_inc.nn` has an almost equal negative correlation of -0.24. We choose `Low.Income` to use in our model because change in demographic indicators such as income levels or race is not consistent with distance. Proximity does not account for "the other side of the tracks" phenomenon where social and economic status is contained within a geographic boundary. And we know low income neighborhoods often face more drug related issues, so we expect a positive correlation. 
 
@@ -939,7 +948,7 @@ ggcorrplot(
 </div>
 <br>
 
-# POISSON REGRESSION
+# **POISSON REGRESSION**
 
 The histogram depicting the distribution of overdose occurrences in 2017 in figure 7 tell us how heavily skewed towards 0 our data is. This is understandable -- as the vast majority of our fishnet cells will have no overdose occurrences within them. The Poisson distribution most similarly resembles our overdose distribution. 
 
@@ -1049,7 +1058,8 @@ error_by_reg_and_fold <-
 
 
 <br>
-### CROSS VALIDATION
+
+## Cross Validation
 
 While an accurate model is very important, we are more concerned with generalizability for the geospatial risk model. This will tell us how well our model performs on seeing new data and its ability to recognize spatial group contexts, like demographic and racial differences across neighborhoods. Our methods for cross-validating our data include k-fold cross validation(CV) and leave one group out cross validation (LOGO-CV). K-fold takes a group of our fishnet cells, trains our model on the remaining cells, tests the prediction on said group, records a goodness of fit metric, and moves onto the next group of cells until every cell has been trained and tested on. LOGO-CV has a similar process, except we are using the Census Tract `GEOID` as the geographic area we exclude and test on. LOGO-CV should ideally use neighborhood geographic boundaries because Census Tracts are often arbitrary, but we were limited by the data available to us. We are also looking to see how each cross validation method performs with and without spatial context by including our Moran's I significance indicator. Therefore, we are running four iterations of our cross validation:   
   
@@ -1090,7 +1100,6 @@ ggplot() +
 ```
 </div>
 <br>
-
 
 <br>
 ```{r Cv.table, echo=FALSE, message=FALSE, warning=FALSE,fig.width =10,fig.height =4}
@@ -1401,16 +1410,77 @@ rbind(opioid_KDE_sf , opioid_risk_sf) %>%
 </div>
 <br>
 
-# CONCLUSION 
+# **CONCLUSION** 
 
-Our model is performing well with a relatively low median average error, but of course there is always opportunity to improve our analysis. 
+Finally, with our model's predictions, we are able to spatially join the commercial and downtown zoned areas to the fishnet cells with the highest prediction count (figure 16.1). The result, depicted in figure 17 and figure 18, shows us which blocks in the city of Mesa will benefit most from the intervention of an OOTC. The darker color indicates which commercial zoning districts intersect with where our model predicted the highest amount of overdose incidents. The blue in surrounding areas are residential zoning districts with high prediction counts that should be a secondary option to the commercial and downtown districts. 
+
+<div class="plot">
+```{r proposed.site, echo=FALSE, message=FALSE, warning=FALSE,fig.width =8,fig.height =6}
+
+# JOIN PREDICTIONS TO ZONE TYPE
+reg.summary.logo<-reg.summary%>% filter(Regression == "Spatial LOGO-CV: Spatial Process")%>%
+  mutate(abs_Error = abs(Error))
+
+grid.arrange(
+#LOGO CV Spatial Predictions
+reg.ss.spatialCV%>%
+  ggplot() + geom_sf(aes(fill = Prediction, colour = Prediction))+
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1)+
+  labs(title='Predictions',subtitle='Spatial LOGO-CV: Spatial Process', caption = 'figure 16.1')+
+  mapTheme()+theme(panel.border=element_blank(),legend.position = "bottom",legend.key.size = unit(.5, 'cm')),
+
+#LOGO CV Spatial Errors
+ggplot() +
+  geom_sf(data = reg.summary.logo, aes(fill = abs_Error, colour = abs_Error)) +
+  scale_fill_viridis(option = "F", direction = -1) +
+  scale_colour_viridis(option = "F", direction = -1) +
+  labs(title = 'Absolute Errors', subtitle='Spatial LOGO-CV: Spatial Process', caption = 'figure 16.2') +
+  mapTheme()+theme(panel.border=element_blank(),legend.position = "bottom",legend.key.size = unit(.5, 'cm')), nrow=1)
+
+#join downtown and commercial zoning districts
+
+site<- rbind(Commercial, Downtown)
+site.second<- rbind(HD_Residential, LD_Residential)
+# reg.ss.spatialCV%>%
+#   ggplot() +
+#   geom_sf(data=site, fill=NA, color = 'black', size = .5, alpha = .5)+ 
+#   geom_sf(aes(fill = Prediction, colour = Prediction), alpha=.5)+
+#   geom_sf(data=city_boundary, fill = NA)+
+#   scale_fill_viridis(option = "F", direction = -1) +
+#   scale_colour_viridis(option = "F", direction = -1)+
+#   labs(title='Predictions',subtitle='Spatial LOGO-CV: Spatial Process')+
+#   mapTheme()+theme(panel.border=element_blank(),legend.position = "bottom",legend.key.size = unit(.5, 'cm'))
+OOTC.site<- st_join(site, reg.ss.spatialCV, join=st_intersects)%>%filter(Prediction > 1)
+OOTC.site.second<- st_join(site.second, reg.ss.spatialCV, join=st_intersects)%>%filter(Prediction > 1)
+
+ggplot() +
+  geom_sf(data= zoning,
+          fill= 'grey90',
+          color = NA,)+
+  geom_sf(data =city_boundary, fill = NA, color ='black')+
+  # geom_sf(data = mesa_tracts17, fill = NA, color ='grey75', size = .25)+
+  geom_sf(data=OOTC.site, aes(fill = Prediction), color =NA)+
+  scale_fill_viridis(option = "F", direction = -1) +
+  geom_sf(data=OOTC.site.second, fill = 'lightblue', color =NA)+
+  labs(title = 'Commercial and Downtown Zones with High Prediction Value', caption = 'figure 17.') +
+  mapTheme()
+
+```
+</div>
+<br>
+
+![figure 18.1](Graphics/pred.map2.png)
+![figure 18.2](Graphics/pred.map.png)
+
+Our model is performing well with a relatively low median average error, but of course there is always opportunity to improve our analysis. Our predictions are limited in accuracy due to the fact that we do not have access to exact location of observed opioid overdose incidents. With permission from the city to move forward on this project, we would respectively request unaggregated point data for the opioid overdose incidents to train our model. We would also request point data for existing health care facilities and schools, which would provide our model with valuable predictive features, and we would expect this data to improve our results. 
 
 
-### REFERENCES
+## References
 
 ^1^ [Opioid Overdose - *A Public Health Emergency; What does opioid overdose look like in Mesa?*](https://data.mesaaz.gov/stories/s/Opioid-Overdose-A-Public-Health-Emergency/ma3e-anqw/)
 
-### CODE APPENDIX
+## Code Appendix
 
 ```{r get-labels, echo = FALSE}
 labs = knitr::all_labels()
