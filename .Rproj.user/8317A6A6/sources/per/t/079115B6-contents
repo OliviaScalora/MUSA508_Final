@@ -1,0 +1,623 @@
+---
+title: 'Assignment 3: Predict Risk of Narcotics Incidents'
+author: "Olivia Scalora"
+date: "11/1/2021"
+output:
+  html_document:
+    toc: true 
+    toc_float: true 
+    toc_depth: 6
+    theme: yeti
+    highlight: textmate
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, echo = FALSE, results='hide', message=FALSE, warning=FALSE }
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE)
+
+library(tidyverse)
+library(sf)
+library(RSocrata)
+library(viridis)
+library(spatstat)
+library(raster)
+library(spdep)
+library(FNN)
+library(grid)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(tidycensus)
+
+# functions
+root.dir = "https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/DATA/"
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+palette5 <- c("#f0f9e8","#bae4bc","#7bccc4","#43a2ca","#0868ac")
+palette1 <- c('#DAD7CD','#A3B18A','#588157', '#3A5A40','#344E41')
+color= '#F0563F'
+color2 = '#a32714'
+color3 = '#539470'
+
+crossValidate <- function(dataset, id, dependentVariable, indVariables) {
+  
+  allPredictions <- data.frame()
+  cvID_list <- unique(dataset[[id]])
+  
+  for (i in cvID_list) {
+    
+    thisFold <- i
+    cat("This hold out fold is", thisFold, "\n")
+    
+    fold.train <- filter(dataset, dataset[[id]] != thisFold) %>% as.data.frame() %>% 
+      dplyr::select(id, geometry, indVariables, dependentVariable)
+    fold.test  <- filter(dataset, dataset[[id]] == thisFold) %>% as.data.frame() %>% 
+      dplyr::select(id, geometry, indVariables, dependentVariable)
+    
+    regression <-
+      glm(countnarcotics ~ ., family = "poisson", 
+          data = fold.train %>% 
+            dplyr::select(-geometry, -id))
+    
+    thisPrediction <- 
+      mutate(fold.test, Prediction = predict(regression, fold.test, type = "response"))
+    
+    allPredictions <-
+      rbind(allPredictions, thisPrediction)
+    
+  }
+  return(st_sf(allPredictions))
+}
+```
+
+```{r data, results='hide', message=FALSE, warning=FALSE }
+
+policeDistricts <- 
+  st_read("https://data.cityofchicago.org/api/geospatial/fthy-xz3r?method=export&format=GeoJSON") %>%
+  st_transform('ESRI:102271') %>%
+  dplyr::select(District = dist_num)
+  
+policeBeats <- 
+  st_read("https://data.cityofchicago.org/api/geospatial/aerh-rz74?method=export&format=GeoJSON") %>%
+  st_transform('ESRI:102271') %>%
+  dplyr::select(District = beat_num)
+
+bothPoliceUnits <- rbind(mutate(policeDistricts, Legend = "Police Districts"), 
+                         mutate(policeBeats, Legend = "Police Beats"))
+
+drugs <- 
+  read.socrata("https://data.cityofchicago.org/Public-Safety/Crimes-2017/d62x-nvdr") %>% 
+    filter(Primary.Type == "NARCOTICS") %>%
+    mutate(x = gsub("[()]", "", Location)) %>%
+    separate(x,into= c("Y","X"), sep=",") %>%
+    mutate(X = as.numeric(X),Y = as.numeric(Y)) %>% 
+    na.omit() %>%
+    st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant")%>%
+    st_transform('ESRI:102271') %>% 
+    distinct()
+
+chicagoBoundary <- 
+  st_read(file.path(root.dir,"/Chapter5/chicagoBoundary.geojson")) %>%
+  st_transform('ESRI:102271') 
+```
+
+This analysis attempts to borrow the experience from places where narcotics incidents are observed, and test whether that experience generalizes to places that may be at risk for narcotics spikes. 
+
+## 1. 2017 Narcotics Incidents
+
+```{r narcotics, message=FALSE, warning=FALSE, fig.width=8}
+# uses grid.arrange to organize indpendent plots
+grid.arrange(nrow=1,
+ggplot() + 
+  geom_sf(data = chicagoBoundary, fill ="white") +
+  geom_sf(data = drugs,fill="white", colour= color, size=0.1, show.legend = "point") +
+  labs(title= "Narcotics Reports, Chicago - 2017") +
+  mapTheme(title_size = 14),
+
+ggplot() + 
+  geom_sf(data = chicagoBoundary, fill = "white", color = "grey65") +
+  stat_density2d(data = data.frame(st_coordinates(drugs)), 
+                 aes(X, Y, fill = ..level.., alpha = ..level..),
+                 size = 0.01, bins = 40, geom = 'polygon') +
+ scale_fill_viridis(option = "F", direction = -1)+
+  scale_alpha(range = c(0.00, 0.35), guide = FALSE) +
+  labs(title = "Density of Narcotics Incidents") +
+  mapTheme(title_size = 14) + theme(), bottom = "fig 1")
+```
+
+## 2. Narcotics incidents joined to fishnet
+
+```{r fishnet, results='hide', message=FALSE, warning=FALSE }
+fishnet <- 
+  st_make_grid(chicagoBoundary,
+               cellsize = 500, 
+               square = TRUE) %>%
+  .[chicagoBoundary] %>%            # <- MDH Added
+  st_sf() %>%
+  mutate(uniqueID = rownames(.))
+```
+
+```{r narc plot, message=FALSE, }
+## add a value of 1 to each crime, sum them with aggregate
+crime_net <- 
+  dplyr::select(drugs) %>% 
+  mutate(countnarcotics = 1) %>% 
+  aggregate(., fishnet, sum) %>%
+  mutate(countnarcotics = replace_na(countnarcotics, 0),
+         uniqueID = rownames(.),
+         cvID = sample(round(nrow(fishnet) / 24), 
+                       size=nrow(fishnet), replace = TRUE))
+
+ggplot() +
+  geom_sf(data = crime_net, aes(fill = countnarcotics), color = NA) +
+  scale_fill_viridis(option = "F", direction = -1) +
+  labs(title = "Count of Narcotics Incidents for the fishnet", 
+       caption = "fig2") +
+  mapTheme()
+
+# For demo. requires updated mapview package
+# xx <- mapview::mapview(crime_net, zcol = "countBurglaries")
+# yy <- mapview::mapview(mutate(burglaries, ID = seq(1:n())))
+# xx + yy
+```
+
+A grid of cells, or 'fishnet' is created to represent how narcotics incidents vary in space. The number of narcotics incidents are counted for each cell, and the aggregate value corresponds to the color scale. 
+
+## 3. Narcotics incidents risk factors in the fishnet
+
+```{r load.data, results='hide', message=FALSE, warning=FALSE }
+
+## Neighborhoods to use in LOOCV in a bit
+neighborhoods <- 
+  st_read("https://raw.githubusercontent.com/blackmad/neighborhoods/master/chicago.geojson") %>%
+  st_transform(st_crs(fishnet)) 
+
+childrenservices <-
+  read.socrata("https://data.cityofchicago.org/resource/jmw7-ijg5.json") %>%
+  filter(division == "Children Services") %>%
+ dplyr::select(Y = location.latitude, X = location.longitude) %>%
+    na.omit() %>%
+    st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+    st_transform(st_crs(fishnet)) %>%
+    mutate(Legend = "childrenservices")
+
+homelessservices <-
+  read.socrata("https://data.cityofchicago.org/resource/jmw7-ijg5.json") %>%
+  filter(division == "Homeless Services") %>%
+    dplyr::select(Y = latitude, X = longitude) %>%
+    na.omit() %>%
+    st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+    st_transform(st_crs(fishnet)) %>%
+    mutate(Legend = "homelessservices")
+
+affordablehousing <-
+  read.socrata("https://data.cityofchicago.org/resource/s6ha-ppgi.json") %>%
+    filter(property_type != "Senior") %>%
+    dplyr::select(Y = latitude, X = longitude) %>%
+    na.omit() %>%
+    st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+    st_transform(st_crs(fishnet)) %>%
+    mutate(Legend = "affordablehousing")
+
+treatmentCenters <-
+  read.socrata("https://data.cityofchicago.org/resource/9zqv-3uhs.json") %>%
+    dplyr::select(Y=physical_address.latitude, X= physical_address.longitude) %>%
+    na.omit() %>%
+   st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+    st_transform(st_crs(fishnet)) %>%
+    mutate(Legend = "treatmentCenter")
+
+
+vars_net <- 
+  rbind(
+        childrenservices,
+        homelessservices,
+        affordablehousing,
+        treatmentCenters)%>%
+  st_join(., fishnet, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID, Legend) %>%
+  summarize(count = n()) %>%
+    full_join(fishnet) %>%
+    spread(Legend, count, fill=0) %>%
+    st_sf() %>%
+    dplyr::select(-`<NA>`) %>%
+    na.omit() %>%
+    ungroup()
+
+# convinience to reduce length of function names.
+st_c    <- st_coordinates
+st_coid <- st_centroid
+
+child_service.nn =
+       nn_function(st_c(st_coid(vars_net)), st_c(childrenservices),3)
+homelessservices.nn =
+       nn_function(st_c(st_coid(vars_net)), st_c(homelessservices),3)
+affordable_housing.nn =
+  nn_function(st_c(st_coid(vars_net)), st_c(affordablehousing),3)
+
+vars_net <-
+  vars_net %>%
+    mutate(
+     treatment_C.nn =
+        nn_function(st_c(st_coid(vars_net)), st_c(treatmentCenters),3),
+     
+     child_service.nn = child_service.nn,
+     homeless_service.nn = homelessservices.nn,
+     afford_housing.nn = affordable_housing.nn)
+
+```
+
+```{r nn.risk,message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+## Visualize the NN feature
+vars_net.long.nn <- 
+  dplyr::select(vars_net, ends_with(".nn")) %>%
+    gather(Variable, value, -geometry)
+
+vars <- unique(vars_net.long.nn$Variable)
+mapList <- list()
+
+for(i in vars){
+  mapList[[i]] <- 
+    ggplot() +
+      geom_sf(data = filter(vars_net.long.nn, Variable == i), aes(fill=value), colour=NA) +
+      scale_fill_viridis(option = "F", direction = -1) +
+      labs(title=i) + theme(legend.position = 'bottom')+
+      mapTheme()}
+
+do.call(grid.arrange,c(mapList, ncol = 4, top = "Nearest Neighbor risk Factors by Fishnet", bottom = "fig 3"))
+```
+
+The risk factors wrangled for this analysis are : substance abuse treatment centers, child service centers, homeless service centers, and affordable housing stock. There are a lot more risk factors to include here but they were kept minimal for the sake of a simple analysis. First, we calculate average (k=3) nearest neighbor distance of each variable. We join each risk factor to the fishnet similarly to our dependent variable, narcotics incidents. The use of the nearest neighbor function essentially creates a smoother exposure relationship across space. 
+
+## 4. Local Moran's I 
+
+```{r data2, results='hide', message=FALSE, warning=FALSE }
+## important to drop the geometry from joining features
+final_net <-
+  left_join(crime_net, st_drop_geometry(vars_net), by="uniqueID") 
+
+final_net <-
+  st_centroid(final_net) %>%
+    st_join(dplyr::select(neighborhoods, name), by = "uniqueID") %>%
+    st_join(dplyr::select(policeDistricts, District), by = "uniqueID") %>%
+      st_drop_geometry() %>%
+      left_join(dplyr::select(final_net, geometry, uniqueID)) %>%
+      st_sf() %>%
+  na.omit()
+
+## generates warnings from PROJ issues
+## {spdep} to make polygon to neighborhoods... 
+final_net.nb <- poly2nb(as_Spatial(final_net), queen=TRUE)
+## ... and neighborhoods to list of weigths
+final_net.weights <- nb2listw(final_net.nb, style="W", zero.policy=TRUE)
+
+#print(final_net.weights, zero.policy=TRUE)
+
+## see ?localmoran
+local_morans <- localmoran(final_net$countnarcotics, final_net.weights, zero.policy=TRUE) %>% 
+  as.data.frame()
+
+# join local Moran's I results to fishnet
+final_net.localMorans <- 
+  cbind(local_morans, as.data.frame(final_net)) %>% 
+  st_sf() %>%
+  dplyr::select(narcotics_count = countnarcotics, 
+                Local_Morans_I = Ii, 
+                P_Value = `Pr(z != E(Ii))`) %>%
+  mutate(Significant_Hotspots = ifelse(P_Value <= 0.001, 1, 0)) %>%
+  gather(Variable, Value, -geometry)
+
+  
+vars <- unique(final_net.localMorans$Variable)
+varList <- list()
+
+```
+
+```{r plot.local.morans,  message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+
+for(i in vars){
+  varList[[i]] <- 
+    ggplot() +
+      geom_sf(data = filter(final_net.localMorans, Variable == i), 
+              aes(fill = Value), colour=NA) +
+      scale_fill_viridis(option = "F", direction = -1) +
+      labs(title=i) +
+      mapTheme() + theme(legend.position="bottom")}
+
+do.call(grid.arrange,c(varList, ncol = 4, top = "Local Morans I statistics, Narcotics Incidents", bottom = "fig 4"))
+```
+
+The Local Moran's I statistics describes the local spatial process of narcotics incidents. The plots in figure 4 illustrate several useful statistical tests. The hot-spots depicted in the density map of figure 1 are now more prominently defined. 
+
+## 5. Scatter plot correlations
+
+```{r results='hide', message=FALSE, warning=FALSE}
+# generates warning from NN
+final_net <- final_net %>% 
+  mutate(narcotics.isSig = 
+           ifelse(local_morans[,5] <= 0.001, 1, 0)) %>%
+  mutate(narcotics.isSig.dist = 
+           nn_function(st_c(st_coid(final_net)),
+                       st_c(st_coid(filter(final_net, 
+                                           narcotics.isSig == 1))), 
+                       k = 1))
+
+```
+
+```{r corr.plot, message=FALSE, warning=FALSE, fig.height=10}
+#### for counts
+correlation.long <-
+  st_drop_geometry(final_net) %>%
+    dplyr::select(-uniqueID, -cvID,  -name, -District) %>%
+    gather(Variable, Value, -countnarcotics)
+
+ ##### for nn
+
+correlation.cor <-
+  correlation.long %>%
+    group_by(Variable) %>%
+    summarize(correlation = cor(Value, countnarcotics, use = "complete.obs"))
+
+ggplot(correlation.long, aes(Value, countnarcotics)) +
+  geom_point(size = 1, color = color) +
+  geom_text(data = correlation.cor, aes(label = paste("r =", round(correlation, 2))),
+            x=-Inf, y=Inf, vjust = 1.5, hjust = -.1) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black") +
+  facet_wrap(~Variable, ncol = 2, scales = "free") +
+  labs(title = "Narcotics Incidents count as a function of risk factors",
+       caption = "fig 5") +
+  plotTheme()
+```
+
+The correlation plots in figure 5 show the count of each predictor next to the nearest neighbor function. Here, we determine which version of the predictor to use, the count or the nearest neighbor function. For the regression, we will select the count of the predictors because of the strong correlation between each predictor and the number of narcotics incidents. 
+
+## 6. Histogram of dependent variable
+
+```{r hist, message=FALSE, warning=FALSE}
+#Histogram of dependent Variable
+final_net %>%
+  ggplot(aes(countnarcotics,))+
+    geom_histogram(bins = 50, colour="black", fill = color) +
+  scale_x_continuous(breaks = seq(0, 100, by = 20)) + 
+  scale_y_continuous(breaks = seq(0,1500, by = 200))+
+    labs(title="Distribution of Narcotics Incidents", subtitle = "Chigago, IL",
+         x="Narcotics Incident Count", y="Frequency", 
+         caption = "fig 6") 
+```
+
+The histogram illustrates a skewed distribution of narcotics incidents. 
+
+## 7. Cross Validation error maps
+
+```{r cv, results='hide', message=FALSE, warning=FALSE}
+colnames(final_net)
+# View(crossValidate)
+
+## define the variables we want
+reg.ss.vars <- c("treatment_C.nn", "homeless_service.nn", "child_service.nn", "afford_housing.nn", "narcotics.isSig", "narcotics.isSig.dist" )
+
+## RUN REGRESSIONS
+
+#### K-fold
+reg.ss.Kfold.spatialCV <- crossValidate(
+  dataset = final_net,
+  id = "cvID",                           
+  dependentVariable = "countnarcotics",
+  indVariables = reg.ss.vars) %>%
+    dplyr::select(cvID, countnarcotics, Prediction, geometry)
+
+#### Spatial LOGO-CV: Spatial Process
+reg.ss.LOGO.spatialCV <- crossValidate(
+  dataset = final_net,
+  id = "name",                           
+  dependentVariable = "countnarcotics",
+  indVariables = reg.ss.vars) %>%
+    dplyr::select(cvID = name, countnarcotics, Prediction, geometry)
+
+#### bind
+
+reg.summary <- 
+  rbind(
+    mutate(reg.ss.Kfold.spatialCV,        Error = Prediction - countnarcotics,
+                             Regression = "Random k-fold CV"),
+     mutate(reg.ss.LOGO.spatialCV, Error = Prediction - countnarcotics,
+                             Regression = "Spatial LOGO-CV")) %>%
+    st_sf() 
+
+# calculate errors by NEIGHBORHOOD
+error_by_reg_and_fold <- 
+  reg.summary  %>%
+    group_by(Regression, cvID) %>% 
+    summarize(Mean_Error = mean(Prediction - countnarcotics, na.rm = T),
+              MAE = mean(abs(Mean_Error), na.rm = T),
+              SD_MAE = mean(abs(Mean_Error), na.rm = T)) %>%
+  ungroup()
+error_by_reg_and_fold %>% 
+  arrange(desc(MAE))
+error_by_reg_and_fold %>% 
+  arrange(MAE)
+```
+
+```{r plot.errors,message=FALSE, warning=FALSE}
+ggplot() +
+  geom_sf(data = reg.summary, aes(fill = Prediction, colour = Prediction)) +
+          scale_fill_viridis(option = "F", direction = -1) +
+          scale_colour_viridis(option = "F", direction = -1) +
+          facet_wrap(~Regression) +  
+          labs(title="Narcotics Incidents Errors", subtitle = "Random K-Fold and      Spatial Cross Validation", caption = "fig #") +
+           mapTheme()
+```
+
+```{r errors.hist, include = FALSE, message=FALSE, warning=FALSE}
+## plot histogram of OOF (out of fold) errors
+error_by_reg_and_fold %>%
+  ggplot(aes(MAE)) + 
+    geom_histogram(bins = 30, colour="black", fill = color) +
+    facet_wrap(~Regression) +  
+    geom_vline(xintercept = 0) + scale_x_continuous(breaks = seq(0, 8, by = 1)) + 
+    labs(title="Distribution of MAE", subtitle = "k-fold cross validation vs. LOGO-CV",
+         x="Mean Absolute Error", y="Count", caption = "fig 7") +
+    plotTheme()
+
+```
+
+We use two types of spatial cross validation to test whether our model is generalizable. Random k-fold cross validation and leave one group out cross-validation (LOGO). Figure 7 visualizes the errors of each cross-validation method. We are not able to determine visually, based on these maps, which method has greater errors. Table 1 below tells us that the difference in the mean average error of each cross validation method is marginally different, by .09. 
+
+
+## 8. Table of MAE and standard deviation MAE by regression
+
+```{r error.table, message=FALSE, warning=FALSE}
+st_drop_geometry(error_by_reg_and_fold) %>%
+  group_by(Regression) %>% 
+    summarize(Mean_MAE = round(mean(MAE), 2),
+              SD_MAE = round(sd(MAE), 2)) %>%
+  kable(caption = 'Table 1') %>%
+    kable_material() 
+```
+
+## 9. table of raw errors by race context for random k-fold vs spatial cross validation regression
+
+```{r race.data, results='hide', message=FALSE, warning=FALSE}
+#RaceContext
+tracts18 <- 
+  get_acs(geography = "tract", variables = c("B01001_001E","B01001A_001E"), 
+          year = 2018, state=17, county=031, geometry=T) %>%
+  st_transform('ESRI:102271')  %>% 
+  dplyr::select(variable, estimate, GEOID) %>%
+  spread(variable, estimate) %>%
+  rename(TotalPop = B01001_001,
+         NumberWhites = B01001A_001) %>%
+  mutate(percentWhite = NumberWhites / TotalPop,
+         raceContext = ifelse(percentWhite > .5, "Majority_White", "Majority_Non_White")) %>%
+  .[neighborhoods,]
+```
+
+```{r race.table, message=FALSE, warning=FALSE}
+#race context table
+reg.summary %>% 
+    st_centroid() %>%
+    st_join(tracts18) %>%
+    na.omit() %>%
+      st_drop_geometry() %>%
+      group_by(Regression, raceContext) %>%
+      summarize(mean.Error = mean(Error, na.rm = T)) %>%
+      spread(raceContext, mean.Error) %>%
+      kable(caption = "Table 2") %>%
+        kable_material()
+```
+The next step is to load race data at the tract level from the 2018 Census. We calculate the percentage of white population for each tracts. Tracts with over 50% white population are labeled "Majority_White" and the same with under 50% white population are labeled "Majority_Non_White." We then are able to create table 2, which illustrates how our models generalize by neighborhood demographic context. We present the mean errors of each regression by neighborhood context. A positive error means the model is over-predicting and a negative error means the model is under-predicting. Our errors are smaller than our pre-neighborhood context model, ans we see that the model is not over-predicting in majority non-white Census Tracts. 
+
+```{r data18, results='hide', message=FALSE, warning=FALSE}
+# Step 1
+narc18 <- 
+  read.socrata("https://data.cityofchicago.org/Public-Safety/Crimes-2018/d62x-nvdr") %>% 
+    filter(Primary.Type == "NARCOTICS") %>%
+    mutate(x = gsub("[()]", "", Location)) %>%
+    separate(x,into= c("Y","X"), sep=",") %>%
+    mutate(X = as.numeric(X),Y = as.numeric(Y)) %>% 
+    na.omit() %>%
+    st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant")%>%
+    st_transform('ESRI:102271') %>% 
+    distinct()%>%
+  .[fishnet,]
+
+```
+
+## 10. Map comparing kernel density to risk predictions for 2018 crime
+
+```{r data182, results='hide', message=FALSE, warning=FALSE}
+
+
+# Step 2
+narc_ppp <- as.ppp(st_coordinates(drugs), W = st_bbox(final_net))
+narc_KD <- spatstat.core::density.ppp(narc_ppp, 1000)
+
+narc_KDE_sf <- as.data.frame(narc_KD) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(final_net)) %>%
+  aggregate(., final_net, mean) %>%
+  mutate(label = "Kernel Density",
+         Risk_Category = ntile(value, 100),
+         Risk_Category = case_when(
+           Risk_Category >= 90 ~ "90% to 100%",
+           Risk_Category >= 70 & Risk_Category <= 89 ~ "70% to 89%",
+           Risk_Category >= 50 & Risk_Category <= 69 ~ "50% to 69%",
+           Risk_Category >= 30 & Risk_Category <= 49 ~ "30% to 49%",
+           Risk_Category >= 1 & Risk_Category  <= 29 ~ "1% to 29%")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(narc18) %>% mutate(narcoticsCount = 1), ., sum) %>%
+    mutate(narcoticsCount = replace_na(narcoticsCount, 0))) %>%
+  dplyr::select(label, Risk_Category, narcoticsCount)
+
+# Step 3
+narc_risk_sf <-
+  filter(reg.summary, Regression == "Spatial LOGO-CV") %>%
+  mutate(label = "Risk Predictions",
+         Risk_Category = ntile(Prediction, 100),
+         Risk_Category = case_when(
+           Risk_Category >= 90 ~ "90% to 100%",
+           Risk_Category >= 70 & Risk_Category <= 89 ~ "70% to 89%",
+           Risk_Category >= 50 & Risk_Category <= 69 ~ "50% to 69%",
+           Risk_Category >= 30 & Risk_Category <= 49 ~ "30% to 49%",
+           Risk_Category >= 1 & Risk_Category <= 29 ~ "1% to 29%")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(narc18) %>% mutate(narcoticsCount = 1), ., sum) %>%
+    mutate(narcoticsCount = replace_na(narcoticsCount, 0))) %>%
+  dplyr::select(label, Risk_Category, narcoticsCount)
+
+# Step 4
+rbind(narc_KDE_sf, narc_risk_sf) %>%
+  na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category, -geometry) %>%
+  ggplot() +
+    geom_sf(aes(fill = Risk_Category), colour = NA) +
+    geom_sf(data = sample_n(narc18, 3000), size = .5, colour = "black") +
+    facet_wrap(~label, ) +
+    scale_fill_viridis(option = "F", direction = -1, discrete = TRUE, alpha = .75) +
+    labs(title="Figure 17: Comparison of Kernel Density and Risk Predictions",
+         subtitle="2017 Narcotics Risk Predictions; 2018 Narcotics", caption = "fig 8") +
+    mapTheme()
+
+```
+
+Since we have built a predictive model on 2017 data, we can now wrangle 2018 narcotics incidents data for Chicago and compare how our model predicts to actual recorded observations. In figure 8, we see the kernel density map(left) of our 2017 data with 2018 data points overlaid. The risk prediction map indicates our model's predicted narcotics incidents based on 2017 data as it compares to actual narcotics incidents of 2018.
+
+## 11. bar plot making this comparison
+
+```{r compare.predict, message=FALSE, warning=FALSE}
+rbind(narc_KDE_sf, narc_risk_sf) %>%
+  st_set_geometry(NULL) %>% na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category) %>%
+  group_by(label, Risk_Category) %>%
+  summarize(countnarcotics = sum(Value)) %>%
+  ungroup() %>%
+  group_by(label) %>%
+  mutate(Rate_of_test_set_crimes = countnarcotics / sum(countnarcotics)) %>%
+    ggplot(aes(Risk_Category,Rate_of_test_set_crimes)) +
+      geom_bar(aes(fill=label), position="dodge", stat="identity") +
+      scale_fill_manual(values=c('#ed7a2d', '#590b43'))+
+      labs(title = "Risk prediction vs. Kernel density, 2018 robberies",
+           x = 'Risk Category',
+           y = 'Rate of Test Set Crimes', 
+           caption = "fig 9") +
+      theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+```
+
+This final plot visualized the comparison made above in perhaps a more objective manner. We see in the highest risk category, risk predictions are quite a bit lower than the Kernel Density. This tells us that our model may not be the best fit quite yet to predict future narcotics incidents. For this reason, I cannot confidently recommend this algorithm to be put into production. 
+
+## Predictive Policing.
+
+Predictive policing has potential to be hugely problematic. While police departments are looking for tools and strategies to allocate resources effectively, these tools often introduce bias, perpetuating the terrorization of minority neighborhoods by law enforcement. As we know, Black and Brown neighborhoods often have higher crime rates simply because they are being over-policed, not necessarily because more crime exists in these communities.
+
+This is the same kind of bias which we see in our data. The data we analyze is all narcotics incidents in Chicago in 2017. This category includes everything from possession of cannabis to possession of methamphetamine. It is much more likely for minority neighborhoods to have higher rates of **reported** possession of cannabis incidents than, for example, an affluent white neighborhood, even if the true numbers are not so different. The narcotics incidents hot-spot, which we saw in figure 4, represents West Garfield Park, Chicago's well known open air drug market. The other slightly dense area is West Englewood, which has a Black population of 91.2%. 
+
+While machine learning is a powerful tool for predicting risk, its application to police resource allocation poses a threat to Black and Brown communities because of crime reporting and selection bias. I believe this process would be more applicable and equitable in predicting the risk or probability of an event such as new development, or gentrification. 
+
+
+
+
+

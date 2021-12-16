@@ -1,0 +1,553 @@
+#---- Set Up ----
+
+  # Load Libraries
+  
+  library(tidyverse)
+  library(tidycensus)
+  library(sf)
+  library(kableExtra)
+  library(ggplot2)
+  
+
+  options(scipen=999)
+  options(tigris_class = "sf")
+
+#---- Load Styling options -----
+
+  mapTheme <- function(base_size = 12) {
+    theme(
+      text = element_text( color = "black"),
+      plot.title = element_text(size = 16,colour = "black"),
+      plot.subtitle=element_text(face="italic"),
+      plot.caption=element_text(hjust=0),
+      axis.ticks = element_blank(),
+      panel.background = element_blank(),axis.title = element_blank(),
+      axis.text = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_rect(colour = "black", fill=NA, size=2),
+      strip.text.x = element_text(size = 14)
+      )
+  }
+    
+  plotTheme <- function(base_size = 12) {
+      theme(
+        text = element_text( color = "black"),
+        plot.title = element_text(size = 16,colour = "black"),
+        plot.subtitle = element_text(face="italic"),
+        plot.caption = element_text(hjust=0),
+        axis.ticks = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_line("grey80", size = 0.1),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour = "black", fill=NA, size=2),
+        strip.background = element_rect(fill = "grey80", color = "white"),
+        strip.text = element_text(size=12),
+        axis.title = element_text(size=12),
+        axis.text = element_text(size=10),
+        plot.background = element_blank(),
+        legend.background = element_blank(),
+        legend.title = element_text(colour = "black", face = "italic"),
+        legend.text = element_text(colour = "black", face = "italic"),
+        strip.text.x = element_text(size = 14)
+      )
+    }
+  
+  # Load Quantile break functions
+  
+  # qBr <- function(df, variable, rnd)
+  #   if (missing(rnd))
+  #   as.character(quantile(round(df[[variable]],0),
+  #                          c(.01,.2,.4,.6,.8), na.rm=T))
+  #     else if (rnd == FALSE | rnd == F) {
+  #    as.character(formatC(quantile(df[[variable]]), digits = 3),
+  #                 c(.01,.2,.4,.6,.8), na.rm=T)
+
+  qBr <- function(df, variable, rnd) {
+    if (missing(rnd)) 
+      as.character(quantile(round(df[[variable]],0),
+                            c(.01,.2,.4,.6,.8), na.rm=T))
+     else if (rnd == FALSE | rnd == F) 
+      as.character(formatC(quantile(df[[variable]],
+                                    c(.01,.2,.4,.6,.8), na.rm=T), digits = 3))}
+  
+  
+  q5 <- function(variable) {
+    as.factor(ntile(variable, 5))}
+
+#---- Color Palettes ----------
+
+  palette3 <- c( "#ffffd4","#fed98e", "#fe9929", "#d95f0e","#993404")
+  
+  palette4 <- c( "#ffffd4","#fe9929", "#d95f0e")
+
+#---- Year 2010 tracts -----
+
+  tracts10 <- { 
+    get_acs(geography = "tract", variables = c("B25026_001E","B19013_001E","B25058_001E",
+                                               "B06012_002E", "B25003_003E", "B25003_002E", "B25004_001E" ), 
+            year=2010, state=12, county=086, geometry=T,output='wide') %>% 
+    st_transform('EPSG:2236') } 
+  
+  vars <- load_variables(2019, "acs5")
+  
+                    
+  # INDICATOR VARIABLES
+  
+  # B25003_003 - TOTAL ESTIMATE RENTER OCCUPIED  OWN / (RENT + OWN)
+  
+  # B25003_002 - TOTAL ESTIMATE OWNER OCCUPIED
+  
+  # B25004_001 - TOTAL VACANT UNITS 
+
+
+#---- Manipulate 2010 data---------
+  
+  # Filter out 3 larger census tracts that represent National Park Area 
+  # For better scale reference for data
+  tracts10 <- {
+    tracts10 %>%
+    filter(GEOID != 12086011401) %>%
+    filter(GEOID != 12086011404) %>%
+    filter(GEOID != 12086011500)}
+  
+    #Spread Long data Via Variables - Rename variables
+    tracts10wide  <- {
+      tracts10 %>%
+      dplyr::select( -NAME, -moe) %>%
+      spread(variable, estimate) %>%
+      dplyr::select(-geometry) %>%
+      rename(TotalPop = B25026_001, 
+             MedHHInc = B19013_001, 
+             MedRent = B25058_001,
+             TotalPoverty = B06012_002,
+             TotalRent = B25003_003,
+             TotalOwn = B25003_002,
+             VacantUnits = B25004_001)}
+    
+    
+    # Create new rate variables using mutate
+    tracts10wide <- {
+      tracts10wide %>%
+      mutate(pctPoverty = ifelse(TotalPop > 0, TotalPoverty / TotalPop, 0),
+             pctOwn = ifelse(TotalOwn > 0, (TotalOwn / (TotalRent + TotalOwn) *100), 0),
+             year = "2010") %>%
+      dplyr::select(-TotalPoverty, -TotalRent, -TotalOwn)}
+  
+#---- 2018 Census Data -----
+
+  # Get indicator variables for year 2018
+  tracts18 <- {
+    get_acs(geography = "tract", variables = c("B25026_001E","B19013_001E","B25058_001E",
+                                                       "B06012_002E", "B25003_003E", "B25003_002E", "B25004_001E" ), 
+                    year=2018, state=12, county=086, geometry=T) %>% 
+              st_transform('EPSG:2236') }
+
+#---- manipulate 2018 data------
+    
+  #filter out largest tracts for scale correction
+  
+  tracts18 <- {
+    tracts18 %>%
+    filter(GEOID != 12086011401) %>%
+    filter(GEOID != 12086011404) %>%
+    filter(GEOID != 12086011500)}
+
+  #Spread 2018 data and rename variables
+  tracts18wide  <- {
+    tracts18 %>%
+    dplyr::select( -NAME, -moe) %>%
+    spread(variable, estimate) %>%
+    dplyr::select(-geometry) %>%
+    rename(TotalPop = B25026_001, 
+           MedHHInc = B19013_001, 
+           MedRent = B25058_001,
+           TotalPoverty = B06012_002,
+           TotalRent = B25003_003,
+           TotalOwn = B25003_002,
+           VacantUnits = B25004_001)}
+  
+  # create new rate variables using mutate 
+  tracts18wide <- {
+    tracts18wide %>%
+    mutate(pctPoverty = ifelse(TotalPop > 0, TotalPoverty / TotalPop, 0),
+           pctOwn = ifelse(TotalOwn > 0, (TotalOwn / (TotalRent + TotalOwn)) * 100, 0),
+           year = "2018") %>%
+    dplyr::select(-TotalPoverty, -TotalRent, -TotalOwn)}
+
+#---- Combining '10 and '18 data------
+
+  allTracts <- rbind(tracts10wide,tracts18wide)
+
+#---- Wrangling Transit Open Data -----
+
+  # read data from local file downloaded from Miami-Dade open data source
+  metrorail <- {st_read("C:/Users/oscal/Documents/UpennMUSA/Semester 1/Public Policy Lab/Assignment1TOD/metrorail data/StationData") %>%
+                st_transform(st_crs(tracts10)) %>%
+               mutate(Line= "metrorail")}
+
+#---- Creating Metro Stop Buffers-------
+
+  # Specify the buffer to be a radius of one mile from the stop
+  # Union individual buffers to become one (or two) polygons. 
+  metrorailBuffer <- {
+    rbind(
+      st_buffer(metrorail, 2640) %>%
+        mutate(Legend = "Buffer") %>%
+        dplyr::select(Legend),
+      st_union(st_buffer(metrorail, 2640)) %>%
+        st_sf() %>%
+        mutate(Legend = "Unioned Buffer"))}
+  
+#---- Selecting Tracts10 That Intersect With Buffer and Plot----
+  
+  # Filters just unioned Buffer and it's geometry
+  buffer <- filter(metrorailBuffer, Legend=="Unioned Buffer")
+  
+
+  # Spatial selection to indicate which tracts intersect with 
+  # the unioned buffer geometry
+  selection <- {
+    tracts10wide[buffer,] %>%
+    dplyr::select(TotalPop) %>%
+    mutate(Selection_type = "Spatial Selection")}
+  
+#---- TOD Indicator Maps----
+
+  #Create TOD vs Non TOD groups - Calculate median rent inflation
+  allTracts.group <- {
+  rbind(
+    allTracts[buffer,] %>%
+      st_drop_geometry() %>%
+      left_join(allTracts) %>%
+      st_sf() %>%
+      mutate(TOD = "TOD"),
+    allTracts[buffer, op = st_disjoint] %>%
+      st_drop_geometry() %>%
+      left_join(allTracts) %>%
+      st_sf() %>%
+      mutate(TOD = "Non-TOD")) %>%
+  mutate(MedRent.inf = ifelse(year == "2000", MedRent * 1.15, MedRent)) }
+
+ # GGPlot Median Rent in 2010 and 2018 (notused)
+  # {ggplot() +
+  # geom_sf(data=st_union(tracts10)) +
+  # geom_sf(data = allTracts.group,
+  #          aes(fill = q5(MedRent.inf)),
+  #          colour = NA) +
+  #  geom_sf(data= buffer,
+  #                colour= 'red',
+  #                fill= NA) +
+  #  scale_fill_manual(values = palette5,
+  #                    labels = qBr(allTracts.group, "MedRent.inf"),
+  #                    name = "Rent\n(Quintile Breaks)") +
+  #  labs(title = "Median Rent", subtitle = "Miami; 2010-2018") +
+  #  facet_wrap(~ year)+
+  #  mapTheme() + plotTheme()}
+  
+    
+    # GGPlot Population in 2010 and 2018
+  {ggplot() +
+      geom_sf(data=st_union(tracts10)) + 
+      geom_sf(data = allTracts.group, 
+              aes(fill = q5(TotalPop)),
+              colour = NA) +
+      geom_sf(data= buffer,
+              colour= 'blue',
+              size = 1,
+              fill= NA) +
+      scale_fill_manual(values = palette3,
+                        labels = qBr(allTracts.group, "TotalPop"),
+                        name = "Population\n(Quintile Breaks)") +
+      labs(title = "Population by Census Tract", subtitle = "Miami; 2010-2018") +
+      facet_wrap(~ year)+
+    mapTheme() + plotTheme()}
+    
+    # GGPlot Med HH Income in 2010 and 2018
+  {ggplot() +
+      geom_sf(data=st_union(tracts10)) + 
+      geom_sf(data = allTracts.group, 
+              aes(fill = q5(MedHHInc)),
+              colour = NA) +
+      geom_sf(data= buffer,
+              colour= 'blue',
+              size = 1,
+              fill= NA) +
+      scale_fill_manual(values = palette3,
+                        labels = qBr(allTracts.group, "MedHHInc"),
+                        name = "Median Household Income\n(Quintile Breaks)") +
+      labs(title = "Median Household Income", subtitle = "Miami; 2010-2018") +
+      facet_wrap(~ year)+
+    mapTheme() + plotTheme()}
+    
+    # GGPlot Pct Homeowner Occupied in 2010 and 2018
+  {ggplot() +
+      geom_sf(data=st_union(tracts10)) + 
+      geom_sf(data = allTracts.group, 
+              aes(fill = q5(pctOwn)),
+              colour = NA) +
+      geom_sf(data= buffer,
+              colour= 'blue',
+              size = 1,
+              fill= NA) +
+      scale_fill_manual(values = palette3,
+                        labels = qBr(allTracts.group, "pctOwn"),
+                        name = "Pct Homeowner Occupied\n(Quintile Breaks)") +
+      labs(title = "Percent of Units Homeowner Occupied", subtitle = "Miami; 2010-2018") +
+      facet_wrap(~ year)+
+    mapTheme() + plotTheme()}
+  
+    # GGPlot Vacant Units in 2010 and 2018
+  {ggplot() +
+      geom_sf(data=st_union(tracts10)) + 
+      geom_sf(data = allTracts.group, 
+              aes(fill = q5(VacantUnits)),
+              colour = NA) +
+      geom_sf(data= buffer,
+              colour= 'blue',
+              size = 1,
+              fill= NA) +
+      scale_fill_manual(values = palette3,
+                        labels = qBr(allTracts.group, "VacantUnits"),
+                        name = "Vacant Units\n(Quintile Breaks)") +
+      labs(title = "Total Vacant Units", subtitle = "Miami; 2010-2018") +
+      facet_wrap(~ year)+
+    mapTheme() + plotTheme()}
+  
+#---- TOD Indicator Tables-----
+  
+  # Create data.frame which includes only variables of interest
+  # Groups by the year and TOD or Non-TOD
+  allTracts.Summary <- {
+    st_drop_geometry(allTracts.group) %>%
+    group_by(year, TOD) %>%
+    summarize(Population = mean(TotalPop, na.rm = T),
+              Vacant_Units = mean(VacantUnits, na.rm = T),
+              MedHHIncome = mean(MedHHInc, na.rm = T),
+              Pct_Own = mean(pctOwn, na.rm = T))}
+  
+  # Rearrange data and plot table with kable command
+  Indicatortable <- {allTracts.Summary %>%
+    unite(year.TOD, year, TOD, sep = ": ", remove = T) %>%
+    gather(Variable, Value, -year.TOD) %>%
+    mutate(Value = round(Value, 2)) %>%
+    spread(year.TOD, Value) %>%
+    kable() %>%
+    kable_styling() %>%
+    footnote(general_title = "\nTable 1.3",
+             general = "Indicator Variables 2010 vs 2018, TOD vs Non-TOD")}
+  
+  Indicatortable
+
+#---- TOD Indicator Bar plots-----
+  
+  #Bar Plot All Indicators across time and space
+   { allTracts.Summary %>%
+      gather(Variable, Value, -year, -TOD) %>%
+      ggplot(aes(year, Value, fill = TOD)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      facet_wrap(~Variable, scales = "free", ncol=5) +
+      scale_fill_manual(values = c("#bae4bc", "#0868ac")) +
+      labs(title = "Indicator differences across time and space") +
+      plotTheme() + theme(legend.position="bottom")}
+  
+#---- Graduated Symbol Maps-----
+  
+  # Define centroid point for all tracts
+  
+    MCentroid <- st_centroid(allTracts)
+  
+   #Define Centroid for just TOD Tracts 
+    TOD <- { allTracts.group %>%
+      filter(TOD == 'TOD')}
+  
+     MCentroidTOD <- st_centroid(TOD)
+  
+#Gradutated Symbol for Population Density
+  { ggplot()+
+    geom_sf(data = allTracts,
+            fill = 'white',
+            color = 'grey75') +
+    geom_sf(data = MCentroidTOD,
+            aes(size = TotalPop,
+                color = TotalPop)) +
+    scale_color_stepsn(colors= palette3,
+                       guide = 'none')+
+    guides(size= guide_legend(override.aes =
+                                (list(color = palette3))))+
+    scale_size( name= "Population" ) +
+    labs(title = "Population of Census Tracts within \n0.5 mi of Metrorail Stations",
+         subtitle = "Miami: 2010 - 2018") +
+    facet_wrap(~ year)+
+       geom_sf(data = metrorail,
+               size = 1,
+               show.legend = TRUE) +
+    mapTheme()}
+  
+#Graduated Symbol for Median Rent
+  { ggplot()+
+   geom_sf(data = allTracts,
+           fill = 'white',
+           color = 'grey75') +
+   geom_sf(data = MCentroidTOD,
+           aes(size = MedRent,
+               color = MedRent)) +
+   scale_color_stepsn(colors= palette4,
+                      guide = 'none')+
+   guides(size= guide_legend(override.aes =
+                               (list(color = palette4))))+
+   scale_size( name= "Median Rent" ) +
+   labs(title = "Median Rent of Census Tracts Within \n0.5 mi of Metrorail Stations",
+        subtitle = "Miami: 2010 - 2018") +
+   facet_wrap(~ year)+
+   geom_sf(data = metrorail,
+           size = 1) +
+   mapTheme()}
+
+  
+#---- Multiple Ring Buffer----
+  
+  # Multi-ring Buffer
+  multipleRingBuffer <- function(inputPolygon, maxDistance, interval) 
+  {
+    #create a list of distances that we'll iterate through to create each ring
+    distances <- seq(0, 26400, 2640)
+    #we'll start with the second value in that list - the first is '0'
+    distancesCounter <- 2
+    #total number of rings we're going to create
+    numberOfRings <- floor(26400 / 2640)
+    #a counter of number of rings
+    numberOfRingsCounter <- 1
+    #initialize an otuput data frame (that is not an sf)
+    allRings <- data.frame()
+    
+    #while number of rings  counter is less than the specified number of rings
+
+  while (numberOfRingsCounter <= numberOfRings) 
+  {
+    #if we're interested in a negative buffer and this is the first buffer
+    #(ie. not distance = '0' in the distances list)
+    if(distances[distancesCounter] < 0 & distancesCounter == 2)
+    {
+      #buffer the input by the first distance
+      buffer1 <- st_buffer(buffer, distances[distancesCounter])
+      #different that buffer from the input polygon to get the first ring
+      buffer1_ <- st_difference(buffer, buffer1)
+      #cast this sf as a polygon geometry type
+      thisRing <- st_cast(buffer1_, "POLYGON")
+      #take the last column which is 'geometry'
+      thisRing <- as.data.frame(thisRing[,ncol(thisRing)])
+      #add a new field, 'distance' so we know how far the distance is for a give ring
+      thisRing$distance <- distances[distancesCounter]
+    }
+    
+    
+    #otherwise, if this is the second or more ring (and a negative buffer)
+    else if(distances[distancesCounter] < 0 & distancesCounter > 2) 
+    {
+      #buffer by a specific distance
+      buffer1 <- st_buffer(buffer, distances[distancesCounter])
+      #create the next smallest buffer
+      buffer2 <- st_buffer(buffer, distances[distancesCounter-1])
+      #This can then be used to difference out a buffer running from 660 to 1320
+      #This works because differencing 1320ft by 660ft = a buffer between 660 & 1320.
+      #bc the area after 660ft in buffer2 = NA.
+      thisRing <- st_difference(buffer2,buffer1)
+      #cast as apolygon
+      thisRing <- st_cast(thisRing, "POLYGON")
+      #get the last field
+      thisRing <- as.data.frame(thisRing$geometry)
+      #create the distance field
+      thisRing$distance <- distances[distancesCounter]
+    }
+    
+    #Otherwise, if its a positive buffer
+    else 
+    {
+      #Create a positive buffer
+      buffer1 <- st_buffer(buffer, distances[distancesCounter])
+      #create a positive buffer that is one distance smaller. So if its the first buffer
+      #distance, buffer1_ will = 0. 
+      buffer1_ <- st_buffer(buffer, distances[distancesCounter-1])
+      #difference the two buffers
+      thisRing <- st_difference(buffer1,buffer1_)
+      #cast as a polygon
+      thisRing <- st_cast(thisRing, "POLYGON")
+      #geometry column as a data frame
+      thisRing <- as.data.frame(thisRing[,ncol(thisRing)])
+      #add teh distance
+      thisRing$distance <- distances[distancesCounter]
+    }  
+    
+    #rbind this ring to the rest of the rings
+    allRings <- rbind(allRings, thisRing)
+    #iterate the distance counter
+    distancesCounter <- distancesCounter + 1
+    #iterate the number of rings counter
+    numberOfRingsCounter <- numberOfRingsCounter + 1
+  }
+    
+    #convert the allRings data frame to an sf data frame
+    allRings <- st_as_sf(allRings)
+}
+  
+     #Plot multi-ring buffer over Median Rent per tract scale
+  { ggplot()+
+    geom_sf(data = st_union(tracts10))+
+    geom_sf(data = allTracts.group,
+            aes(fill = q5(MedRent.inf)),
+            colour = 'grey55') +
+    geom_sf(
+            data = allRings,
+            fill = NA,
+            color = 'grey75')+
+    scale_fill_manual(values = palette3,
+                      labels = qBr(allTracts.group, "MedRent.inf"),
+                      name = "Rent\n(Quintile Breaks)") +
+    labs(title = "Median Rent As A Function of Distance \nto Metrorail Stops in 1/2 mi Intervals", subtitle = "Miami; 2010-2018") +
+    facet_wrap(~ year)+
+    mapTheme() + plotTheme()}
+     
+     
+#---- 311 Service Request Data ----     
+     
+ Miami311 <- st_read("C:/Users/oscal/Documents/UpennMUSA/Semester 1/Public Policy Lab/Assignment1TOD/City_of_Miami_311_Service_Requests_since_2015_(v2).csv") 
+
+     #transform 311 long lat to geometry
+ Miami311_sf <- st_as_sf(Miami311, coords = c("longitude", "latitude"),
+                          crs = 4326, agr = 'constant') %>%
+   st_transform(st_crs(tracts10))
+ 
+ #filter noise violations from 2018
+ Noise_Violation <- Miami311_sf %>%
+     filter(issue_Description == "NOISE VIOLATION")%>%
+   filter(str_detect(created_year_month, '2018'))
+ 
+
+ 
+ 
+ #---- Relationship Between 311, transit access and rents? ----
+ 
+TOD18 <- TOD %>% filter(year == "2018")
+ 
+ {ggplot() +
+ geom_sf(data= allTracts,
+         fill = 'white',
+         color = 'grey55') +
+ geom_sf(data = TOD18,
+          aes(fill = q5(MedRent.inf)),
+          colour = 'grey55') +
+ geom_sf(data = Noise_Violation,
+             size = 2,
+             color = 'blue',
+         aes(
+         label= '311 Calls'))+
+  scale_fill_manual(values = palette3,
+                    labels = qBr(allTracts.group, "MedRent.inf"),
+                    name = "Rent\n(Quintile Breaks)") +
+  labs(title = "Median Rent", subtitle = "Miami;2018") +
+  mapTheme() + plotTheme()}
+
+
+ 
