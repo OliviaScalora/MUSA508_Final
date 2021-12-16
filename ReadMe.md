@@ -45,15 +45,14 @@ Gaps in treatment facility access – there are still people not elligible for A
     
 #### <li>What datasets have you identified to help you answer this question? </li>
 
-*   [Fire and Medical Opioid Overdose Incidents](https://data.mesaaz.gov/Fire-and-Medical/Fire-and-Medical-Opioid-Overdose-Incidents/qufy-tzv6) - Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.
-*   [Census ACS data](https://www.census.gov/programs-surveys/acs) - demographic and socio-economic indicators at the block group level
-*   [Park Locations And Amenities](https://data.mesaaz.gov/Parks-Recreation-and-Community-Facilities/Parks-Locations-And-Amenities/djym-pkpp) - Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.
-*   [UFB Food Distribution 2021l](https://data.mesaaz.gov/Parks-Recreation-and-Community-Facilities/UFB-Food-Distribution-2021/mf65-6nx7) -Information about United Food Bank (UFB) Food Distribution 2021 in partnership with the City of Mesa.
-*   [Student Demographics - Mesa Public Schools](https://data.mesaaz.gov/Neighborhoods/Student-Demographics-Mesa-Public-Schools/svjb-9ytu) - Students Demographics for Mesa Public Schools by School Year and Grade Level since 1979.
-*   [Light Rail Ridership](https://data.mesaaz.gov/Transit-Services/Light-Rail-Ridership/pdpe-wbxu) - For station locations - Breakdown of light rail ridership on a monthly basis per station in Mesa (data lags for approximately 30 days) and is provided by Valley Metro, an external agency who is responsible for both light rail and bus services in Mesa.
-*   [Bus Ridership](https://data.mesaaz.gov/Transit-Services/Bus-Ridership/nmjv-498y) - For bus stop locations - Breakdown of bus service ridership on a monthly basis per route in Mesa (data lags for approximately 30 days) and data is provided by Valley Metro, an external agency who is responsible for both bus service and light rail in Mesa.
-*   [City Boundary Map](https://data.mesaaz.gov/Zoning-Property/City-Boundary-Map/wf8n-kwgk) 
-*   [Zoning Districs](https://data.mesaaz.gov/Zoning-Property/Zoning-Districts/qscf-6ebm) - Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land
+* [**Fire and Medical Opioid Overdose Incidents**](https://data.mesaaz.gov/Fire-and-Medical/Fire-and-Medical-Opioid-Overdose-Incidents/qufy-tzv6) Confirmed cases of opioid overdose, locations are not actual but instead rounded to approximately 1/3 mile increments. Opioid overdose confirmed by 1) patient or witness verification, 2) Opioid found on scene or 3) positive response to Narcan treatment.
+* [**City Property Data**](https://data.mesaaz.gov/Zoning-Property/City-Owned-Property/xms2-ya86) will be filtered to account for various facility type - child crisis center, fire and police station, public housing, arts and education centers.
+* [**Crime Data**](https://data.mesaaz.gov/Police/Police-Incidents/39rt-2rfj) Incidents based on initial police reports taken by officers when responding to calls for service. Data is modified for public use. Address and Location are not exact locations of incidents and have been rounded to nearest hundred block. Lat/Long are approximations only based on rounded hundred block. Incidents reported in this dataset may not correlate with 911 Events datasets and calls for Police service. The City of Mesa does not disclose information that is inflammatory in nature that impacts our citizens. Split by type; misdemeanors and felonies.
+* [**Park Locations And Amenities**](https://data.mesaaz.gov/Parks-Recreation-and-Community-Facilities/Parks-Locations-And-Amenities/djym-pkpp) Information about location and amenities available at developed city parks, park open spaces (basins) maintained by the City of Mesa. Pools, Recreation Centers and other public gathering facilities owned and/or maintained by the City of Mesa's Parks Department such as convention center, amphitheater and cemetery are also listed.
+* [**Light Rail Stations**](https://opengis.mesaaz.gov/datasets/7c6b201d9e38451185032fec51acfaa4_0/explore) This dataset provides information regarding the location of current light rail stations within the City of Mesa and each station’s name and address.
+* [**City Boundary Map**](https://data.mesaaz.gov/Zoning-Property/City-Boundary-Map/wf8n-kwgk) City of Mesa jurisdiction.
+* [**Zoning Districs**](https://data.mesaaz.gov/Zoning-Property/Zoning-Districts/qscf-6ebm) Specifically delineated geographic areas in the city within which regulations and requirements uniformly govern the use of land - separated between High density residential, low density residential, downtown, commercial, and industrial.
+* [**Census ACS data**](https://www.census.gov/programs-surveys/acs) demographic and socio-economic indicators at the tract level.
  
 #### <li>What kind of model would you build and what is the dependent variable? </li>
 
@@ -72,11 +71,11 @@ interactive map and charts - legible data visualizations
 
 App ideas:
 *   Desktop interface
-*   Home page accesible to the public - login feature for official use by fire and medical department
+*   Home page accesible to the public - login feature for official use by city health officials
 *   Public home page offers informational panels and resources for individuals seeking addiction help as well as friends and family of addicts 
-*   Public page displays simple statistics of the opioid crisis of Mesa - how it has changed over time, where the numbers are now - bring awareness
-*   Login page for official use - more in depth access to data and predictive model
-*   A map is displayed of where overdose hotspots have been historically and how our model predicts overdose trends to change spatially
+*   Log in feature displays interactive web map
+*   A map displayed of various features - historic hotspots, predicted hot spots, and recommended commercial blocks where the implementation of OOTC is most urgent according to our predictions. 
+*   App will have tab for downloadable raw data and a link to the code repository for anyone looking to replicate the analysis. 
     
 </ol>
 
