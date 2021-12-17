@@ -1,6 +1,6 @@
 # MUSA 508 Final Project 
 
-**[Youtube link to final presentation](https://www.youtube.com/watch?v=dKI847qx-gI)**
+**[Youtube link to final presentation](https://www.youtube.com/watch?v=dKI847qx-gI)**  
 **[Link to Final Markdown](https://oliviascalora.github.io/Mesa-Opioid-Prediction/)**
 
 ## Predict heroin overdose events to better allocate prevention resources 
